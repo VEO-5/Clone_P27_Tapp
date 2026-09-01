@@ -1,0 +1,188 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   Pearl 27 — Sphere Support Desk
+
+   Tokens taken from pearl27.com: cream paper, navy ink, copper accent,
+   Cormorant Garamond + JetBrains Mono.
+   ========================================================================== */
+
+@theme {
+  --color-ink-950: #faf9f6;
+  --color-ink-900: #f3f0e8;
+  --color-ink-850: #ffffff;
+  --color-ink-800: #ffffff;
+  --color-ink-700: #e4dfd4;
+  --color-ink-600: #d4cec0;
+  --color-ink-500: #2c406b;
+
+  --color-pearl: #1b2a4a;
+  --color-pearl-dim: #243656;
+  --color-mist: #4a5568;
+  --color-fog: #6b7280;
+
+  --color-iris-300: #e8872b;
+  --color-iris-400: #e8872b;
+  --color-iris-500: #e8872b;
+  --color-iris-600: #c97020;
+  --color-aqua-400: #2c406b;
+  --color-aqua-500: #243656;
+  --color-rose-400: #c23b3b;
+  --color-gold-400: #e8872b;
+  --color-jade-400: #2f7a4f;
+
+  --font-sans: var(--font-cormorant), Georgia, "Times New Roman", serif;
+  --font-mono: var(--font-jetbrains), "Courier New", monospace;
+  --font-display: var(--font-cormorant), Georgia, "Times New Roman", serif;
+
+  --animate-aurora: aurora 26s ease-in-out infinite;
+  --animate-rise: rise 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-shimmer: shimmer 2.4s linear infinite;
+  --animate-pulse-ring: pulse-ring 2.6s ease-out infinite;
+}
+
+@keyframes aurora {
+  0%,
+  100% {
+    transform: translate3d(-4%, -2%, 0) scale(1);
+    opacity: 0.55;
+  }
+  33% {
+    transform: translate3d(6%, 4%, 0) scale(1.08);
+    opacity: 0.8;
+  }
+  66% {
+    transform: translate3d(-2%, 7%, 0) scale(1.03);
+    opacity: 0.45;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-iris-500) 35%, transparent);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 12px transparent;
+  }
+}
+
+@layer base {
+  * {
+    border-color: var(--color-ink-700);
+  }
+
+  html {
+    color-scheme: light;
+    scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    background-color: var(--color-ink-950);
+    color: var(--color-pearl);
+    font-family: var(--font-sans);
+    text-rendering: optimizeLegibility;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-iris-400);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--color-iris-500) 28%, transparent);
+    color: var(--color-pearl);
+  }
+
+  ::placeholder {
+    color: var(--color-fog);
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+    font-weight: 500;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-ink-600) transparent;
+  }
+}
+
+@utility glass {
+  background: #ffffff;
+  border: 1px solid rgba(27, 42, 74, 0.12);
+  box-shadow:
+    0 1px 3px rgba(27, 42, 74, 0.06),
+    0 8px 24px -12px rgba(27, 42, 74, 0.12);
+}
+
+@utility hairline {
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    transparent,
+    rgba(27, 42, 74, 0.16) 20%,
+    rgba(27, 42, 74, 0.16) 80%,
+    transparent
+  );
+}
+
+@utility text-iridescent {
+  color: var(--color-pearl);
+  font-style: italic;
+}
+
+@utility eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  font-weight: 400;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-fog);
+}
+
+@utility mono-ref {
+  font-family: var(--font-mono);
+  font-variant-ligatures: none;
+  letter-spacing: 0.04em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
