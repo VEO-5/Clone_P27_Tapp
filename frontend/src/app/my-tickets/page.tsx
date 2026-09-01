@@ -8,6 +8,7 @@ import { EmptyState, Panel } from "@/components/ui/Panel";
 import { getEmployeeSession } from "@/lib/employeeAuth";
 import { getRepository } from "@/lib/repo";
 import { computeStats } from "@/lib/repo/types";
+import type { Ticket } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,7 @@ export default async function MyTicketsPage() {
   const session = await getEmployeeSession();
   if (!session) redirect("/my-tickets/login");
 
-  let tickets = [];
+  let tickets: Ticket[] = [];
   try {
     tickets = await getRepository().listTicketsByEmail(session.email);
   } catch (error) {
