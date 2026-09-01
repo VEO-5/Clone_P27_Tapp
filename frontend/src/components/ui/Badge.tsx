@@ -44,16 +44,25 @@ const SIZES = {
   md: "h-7 gap-2 px-3 text-xs",
 } as const;
 
+const STATUS_STYLES_NIGHT: Record<TicketStatus, string> = {
+  open: "border-cream/20 bg-cream/10 text-cream",
+  in_progress: "border-iris-400/40 bg-iris-500/15 text-iris-300",
+  resolved: "border-jade-400/40 bg-jade-400/15 text-jade-400",
+  closed: "border-cream/15 bg-night-deep text-haze",
+};
+
 export function StatusBadge({
   status,
   size = "md",
   withIcon = true,
   className,
+  surface = "paper",
 }: {
   status: TicketStatus;
   size?: keyof typeof SIZES;
   withIcon?: boolean;
   className?: string;
+  surface?: "paper" | "night";
 }) {
   const style = STATUS_STYLES[status];
 
@@ -61,7 +70,7 @@ export function StatusBadge({
     <span
       className={cn(
         "inline-flex items-center rounded-full border font-semibold tracking-wide",
-        style.chip,
+        surface === "night" ? STATUS_STYLES_NIGHT[status] : style.chip,
         SIZES[size],
         className,
       )}
@@ -76,20 +85,29 @@ export function StatusBadge({
   );
 }
 
+const PRIORITY_STYLES_NIGHT: Record<TicketPriority, string> = {
+  low: "border-cream/15 bg-night-deep text-haze",
+  medium: "border-iris-400/40 bg-iris-500/15 text-iris-300",
+  high: "border-iris-400/40 bg-iris-500/15 text-iris-300",
+  urgent: "border-rose-400/40 bg-rose-400/15 text-rose-400",
+};
+
 export function PriorityBadge({
   priority,
   size = "md",
   className,
+  surface = "paper",
 }: {
   priority: TicketPriority;
   size?: keyof typeof SIZES;
   className?: string;
+  surface?: "paper" | "night";
 }) {
   return (
     <span
       className={cn(
         "inline-flex items-center rounded-full border font-semibold tracking-wide",
-        PRIORITY_STYLES[priority],
+        surface === "night" ? PRIORITY_STYLES_NIGHT[priority] : PRIORITY_STYLES[priority],
         SIZES[size],
         className,
       )}

@@ -69,24 +69,24 @@ export default function SubmitTicketPage() {
         <TicketForm />
 
         <aside className="flex flex-col gap-6 lg:sticky lg:top-24">
-          <Panel className="p-6">
+          <Panel tone="night" lit className="p-6">
             <p className="eyebrow mb-5">What happens next</p>
             <ol className="flex flex-col gap-5">
               {STEPS.map((step, index) => (
                 <li key={step.title} className="flex gap-4">
                   <span className="relative flex flex-col items-center">
-                    <span className="grid size-9 shrink-0 place-items-center rounded-[2px] border border-ink-700 bg-white text-iris-500">
+                    <span className="grid size-9 shrink-0 place-items-center rounded-[2px] border border-cream/10 bg-night-deep text-iris-400">
                       <step.icon className="size-4" aria-hidden />
                     </span>
                     {index < STEPS.length - 1 && (
-                      <span className="mt-2 w-px flex-1 bg-gradient-to-b from-ink-600 to-transparent" />
+                      <span className="mt-2 w-px flex-1 bg-gradient-to-b from-cream/20 to-transparent" />
                     )}
                   </span>
                   <span className="pb-1">
-                    <span className="block text-[13.5px] font-semibold text-pearl">
+                    <span className="block text-[13.5px] font-semibold text-cream">
                       {step.title}
                     </span>
-                    <span className="mt-1 block text-[13px] leading-relaxed text-fog">
+                    <span className="mt-1 block text-[13px] leading-relaxed text-haze">
                       {step.body}
                     </span>
                   </span>
@@ -95,14 +95,14 @@ export default function SubmitTicketPage() {
             </ol>
           </Panel>
 
-          <Panel className="p-6">
+          <Panel tone="night" className="border-l-2 border-l-iris-400 p-6">
             <div className="flex items-start gap-3">
-              <span className="grid size-9 shrink-0 place-items-center rounded-xl border border-jade-400/25 bg-jade-400/10 text-jade-400">
+              <span className="grid size-9 shrink-0 place-items-center rounded-[2px] border border-cream/10 bg-night-deep text-jade-400">
                 <ShieldCheck className="size-4" aria-hidden />
               </span>
               <div>
-                <p className="text-[13.5px] font-semibold text-pearl">Your details stay internal</p>
-                <p className="mt-1 text-[13px] leading-relaxed text-fog">
+                <p className="text-[13.5px] font-semibold text-cream">Your details stay internal</p>
+                <p className="mt-1 text-[13px] leading-relaxed text-haze">
                   Tickets and screenshots are stored in Pearl 27&apos;s private Supabase project.
                   Attachments are never public — they&apos;re served through short-lived signed
                   links.
@@ -111,16 +111,17 @@ export default function SubmitTicketPage() {
             </div>
           </Panel>
 
-          <Panel className="p-6">
-            <p className="text-[13.5px] font-semibold text-pearl">Already submitted something?</p>
-            <p className="mt-1 text-[13px] leading-relaxed text-fog">
+          <Panel tone="night" className="p-6">
+            <p className="eyebrow mb-3">Already on file</p>
+            <p className="text-[13.5px] font-semibold text-cream">Already submitted something?</p>
+            <p className="mt-1 text-[13px] leading-relaxed text-haze">
               Sign in with your work email to see every ticket and its live status.
             </p>
             <LinkButton
               href="/my-tickets"
-              variant="secondary"
+              variant="night"
               size="sm"
-              className="mt-4"
+              className="mt-4 min-h-11"
               trailingIcon={<ArrowRight className="size-3.5" aria-hidden />}
             >
               Open my tickets

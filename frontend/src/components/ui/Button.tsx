@@ -4,7 +4,7 @@ import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ReactNode } from "reac
 
 import { cn } from "@/lib/utils";
 
-type Variant = "primary" | "secondary" | "ghost" | "danger";
+type Variant = "primary" | "secondary" | "ghost" | "danger" | "night";
 type Size = "sm" | "md" | "lg";
 
 const VARIANTS: Record<Variant, string> = {
@@ -15,6 +15,8 @@ const VARIANTS: Record<Variant, string> = {
   ghost: "text-mist hover:bg-ink-900 hover:text-pearl",
   danger:
     "border border-rose-400/30 bg-rose-400/10 text-rose-400 hover:border-rose-400/50 hover:bg-rose-400/15",
+  night:
+    "border border-cream/20 bg-transparent text-cream hover:border-iris-400/50 hover:bg-white/8",
 };
 
 const SIZES: Record<Size, string> = {

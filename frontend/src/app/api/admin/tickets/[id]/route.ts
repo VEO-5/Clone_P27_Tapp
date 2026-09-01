@@ -1,3 +1,4 @@
+import { revalidatePath } from "next/cache";
 import type { NextRequest } from "next/server";
 
 import { isAuthenticated } from "@/lib/adminAuth";
@@ -35,6 +36,12 @@ export async function PATCH(
       const outcome = await sendTicketResolvedEmail(result.ticket, parsed.data.reply);
       emailSent = outcome.sent;
     }
+
+    revalidatePath("/admin");
+    revalidatePath(`/admin/tickets/${id}`);
+    revalidatePath("/my-tickets");
+    revalidatePath("/track");
+    revalidatePath(`/track/${result.ticket.reference}`);
 
     return ok({ ticket: result.ticket, emailSent });
   } catch (error) {

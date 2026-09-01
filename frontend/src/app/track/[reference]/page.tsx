@@ -7,7 +7,7 @@ import { PriorityBadge, StatusBadge } from "@/components/ui/Badge";
 import { LinkButton } from "@/components/ui/Button";
 import { EmptyState, Panel, PanelHeader } from "@/components/ui/Panel";
 import { CopyButton } from "@/components/CopyButton";
-import { CATEGORY_LABELS } from "@/lib/types";
+import { CATEGORY_LABELS, type TicketEvent } from "@/lib/types";
 import { normaliseReference } from "@/lib/reference";
 import { getRepository } from "@/lib/repo";
 import { formatDateTime } from "@/lib/utils";
@@ -34,13 +34,14 @@ export default async function TrackTicketPage({
   if (!ticket) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-20 sm:px-6">
-        <Panel>
+        <Panel tone="night">
           <EmptyState
+            tone="night"
             icon={<SearchX className="size-5" aria-hidden />}
             title="No ticket found"
             description={`Nothing matches ${normaliseReference(reference)}. Check the code, or look it up by the email you used.`}
             action={
-              <LinkButton href="/track" variant="secondary">
+              <LinkButton href="/track" variant="night">
                 Try another lookup
               </LinkButton>
             }
@@ -90,12 +91,14 @@ export default async function TrackTicketPage({
           ))}
         </div>
 
-        <div className="flex flex-col gap-8 p-6 sm:p-8">
-          <section>
-            <p className="eyebrow mb-3">Description</p>
-            <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-pearl-dim">
-              {ticket.description}
-            </p>
+          <div className="flex flex-col gap-8 p-6 sm:p-8">
+            <LatestEmployeeUpdate events={ticket.events} />
+
+            <section>
+              <p className="eyebrow mb-3">Description</p>
+              <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-pearl-dim">
+                {ticket.description}
+              </p>
             <div className="mt-4">
               <CopyButton value={ticket.reference} label="Copy reference" />
             </div>
@@ -113,5 +116,20 @@ export default async function TrackTicketPage({
         </div>
       </Panel>
     </div>
+  );
+}
+
+function LatestEmployeeUpdate({ events }: { events: TicketEvent[] }) {
+  const latest = [...events].sort((a, b) => a.createdAt.localeCompare(b.createdAt)).at(-1);
+  if (!latest || latest.type === "created") return null;
+
+  return (
+    <section className="rounded-[4px] border border-cream/10 border-l-2 border-l-iris-400 bg-night px-4 py-3.5">
+      <p className="eyebrow mb-1.5">Latest update</p>
+      <p className="text-[15px] font-medium text-cream">{latest.message}</p>
+      <p className="mt-1 text-[12.5px] text-haze">
+        {latest.actor === "support" ? "Support" : "Update"} · {formatDateTime(latest.createdAt)}
+      </p>
+    </section>
   );
 }

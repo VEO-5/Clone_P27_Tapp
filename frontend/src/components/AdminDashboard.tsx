@@ -5,7 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Inbox, Search } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
 
-import { PriorityBadge, StatusBadge } from "@/components/ui/Badge";
+import { AdminQueueActions } from "@/components/AdminQueueActions";
+import { NightStatButton } from "@/components/ui/NightStat";
 import { EmptyState } from "@/components/ui/Panel";
 import { Input, Select } from "@/components/ui/Form";
 import {
@@ -18,7 +19,7 @@ import {
   type TicketStats,
   type TicketStatus,
 } from "@/lib/types";
-import { cn, formatRelative } from "@/lib/utils";
+import { formatRelative } from "@/lib/utils";
 
 const KPI: { key: keyof TicketStats; label: string; status?: TicketStatus }[] = [
   { key: "open", label: "Open", status: "open" },
@@ -79,20 +80,13 @@ export function AdminDashboard({
         {KPI.map((card) => {
           const active = card.status ? status === card.status : status === "all" && !card.status;
           return (
-            <button
+            <NightStatButton
               key={card.key}
-              type="button"
+              label={card.label}
+              value={stats[card.key]}
+              active={Boolean(active && (card.status || status === "all"))}
               onClick={() => replaceFilters({ status: card.status ?? "all" })}
-              className={cn(
-                "rounded-2xl border px-5 py-4 text-left transition-colors",
-                active && card.status
-                  ? "border-iris-400/40 bg-iris-500/10"
-                  : "border-ink-700 bg-ink-850/70 hover:border-ink-500",
-              )}
-            >
-              <dt className="text-[12px] font-medium text-fog">{card.label}</dt>
-              <dd className="mt-1 font-display text-3xl text-pearl">{stats[card.key]}</dd>
-            </button>
+            />
           );
         })}
       </dl>
@@ -159,22 +153,22 @@ export function AdminDashboard({
         <>
           <ul className="flex flex-col gap-3 lg:hidden">
             {filtered.map((ticket) => (
-              <li key={ticket.id}>
-                <Link
-                  href={`/admin/tickets/${ticket.id}`}
-                  className="block rounded-2xl border border-ink-700 bg-ink-850/70 p-4"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="mono-ref text-[12px] text-iris-300">{ticket.reference}</span>
-                    <StatusBadge status={ticket.status} size="sm" />
-                  </div>
+              <li key={ticket.id} className="rounded-2xl border border-ink-700 bg-ink-850/70 p-4">
+                <Link href={`/admin/tickets/${ticket.id}`} className="block">
+                  <span className="mono-ref text-[12px] text-iris-300">{ticket.reference}</span>
                   <p className="mt-2 font-semibold text-pearl">{ticket.title}</p>
                   <p className="mt-1 text-[12.5px] text-mist">
                     {ticket.employeeName} · {formatRelative(ticket.createdAt)}
                   </p>
-                  <div className="mt-3">
-                    <PriorityBadge priority={ticket.priority} size="sm" />
-                  </div>
+                </Link>
+                <div className="mt-4 border-t border-ink-700/80 pt-4">
+                  <AdminQueueActions ticket={ticket} />
+                </div>
+                <Link
+                  href={`/admin/tickets/${ticket.id}`}
+                  className="mt-1 inline-flex min-h-11 items-center text-[13px] font-medium text-iris-300 hover:underline"
+                >
+                  Open ticket and reply
                 </Link>
               </li>
             ))}
@@ -187,8 +181,7 @@ export function AdminDashboard({
                   <th className="px-5 py-3 font-medium">Reference</th>
                   <th className="px-5 py-3 font-medium">Issue</th>
                   <th className="px-5 py-3 font-medium">Requester</th>
-                  <th className="px-5 py-3 font-medium">Status</th>
-                  <th className="px-5 py-3 font-medium">Priority</th>
+                  <th className="px-5 py-3 font-medium">Update status</th>
                   <th className="px-5 py-3 font-medium">Submitted</th>
                 </tr>
               </thead>
@@ -213,13 +206,16 @@ export function AdminDashboard({
                       <div className="text-[12px] text-fog">{ticket.employeeEmail}</div>
                     </td>
                     <td className="px-5 py-3.5">
-                      <StatusBadge status={ticket.status} size="sm" />
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <PriorityBadge priority={ticket.priority} size="sm" />
+                      <AdminQueueActions ticket={ticket} />
                     </td>
                     <td className="px-5 py-3.5 text-[13px] text-fog">
                       <time dateTime={ticket.createdAt}>{formatRelative(ticket.createdAt)}</time>
+                      <Link
+                        href={`/admin/tickets/${ticket.id}`}
+                        className="mt-2 block font-medium text-iris-300 hover:underline"
+                      >
+                        Reply
+                      </Link>
                     </td>
                   </tr>
                 ))}

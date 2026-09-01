@@ -265,13 +265,14 @@ export const supabaseRepository: TicketRepository = {
 
     const { patch, events, notifyResolved } = planUpdate(existing, input);
 
-    if (Object.keys(patch).length > 0) {
+    if (Object.keys(patch).length > 0 || events.length > 0) {
       const { error } = await db()
         .from("tickets")
         .update({
           ...(patch.status ? { status: patch.status } : {}),
           ...(patch.priority ? { priority: patch.priority } : {}),
           ...(patch.resolvedAt !== undefined ? { resolved_at: patch.resolvedAt } : {}),
+          updated_at: new Date().toISOString(),
         })
         .eq("id", id);
 

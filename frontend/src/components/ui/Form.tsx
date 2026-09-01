@@ -27,6 +27,7 @@ export interface FieldProps {
   optional?: boolean;
   className?: string;
   children: ReactNode;
+  tone?: "paper" | "night";
 }
 
 /**
@@ -42,16 +43,25 @@ export function Field({
   optional,
   className,
   children,
+  tone = "paper",
 }: FieldProps) {
+  const night = tone === "night";
   return (
     <div className={cn("flex flex-col gap-2", className)}>
       <div className="flex items-baseline justify-between gap-3">
-        <label htmlFor={htmlFor} className="text-[13px] font-medium text-pearl-dim">
+        <label
+          htmlFor={htmlFor}
+          className={cn("text-[13px] font-medium", night ? "text-cream" : "text-pearl-dim")}
+        >
           {label}
-          {optional && <span className="ml-2 text-[11px] font-normal text-fog">Optional</span>}
+          {optional && (
+            <span className={cn("ml-2 text-[11px] font-normal", night ? "text-haze" : "text-fog")}>
+              Optional
+            </span>
+          )}
         </label>
         {hint && !error && (
-          <span className="text-[11px] text-fog" id={`${htmlFor}-hint`}>
+          <span className={cn("text-[11px]", night ? "text-haze" : "text-fog")} id={`${htmlFor}-hint`}>
             {hint}
           </span>
         )}

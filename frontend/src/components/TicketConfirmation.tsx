@@ -40,12 +40,16 @@ export function TicketConfirmation({
           </p>
         </div>
 
-        <div className="flex w-full flex-col items-center gap-3 rounded-2xl border border-ink-600 bg-ink-900/70 px-6 py-5">
+        <div className="glass-night flex w-full flex-col items-center gap-3 rounded-[4px] px-6 py-6">
           <p className="eyebrow">Ticket reference</p>
-          <p className="mono-ref text-3xl font-medium text-pearl sm:text-4xl">
+          <p className="mono-ref text-3xl font-medium text-cream sm:text-4xl">
             {ticket.reference}
           </p>
-          <CopyButton value={ticket.reference} label="Copy reference" />
+          <CopyButton
+            value={ticket.reference}
+            label="Copy reference"
+            className="border-cream/20 bg-transparent text-cream hover:border-iris-400/50 hover:bg-white/8 hover:text-cream"
+          />
         </div>
 
         <dl className="grid w-full gap-px overflow-hidden rounded-xl border border-ink-700 bg-ink-700 sm:grid-cols-3">

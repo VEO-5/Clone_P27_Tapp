@@ -21,6 +21,11 @@
   --color-mist: #4a5568;
   --color-fog: #6b7280;
 
+  --color-night: #162035;
+  --color-night-deep: #101828;
+  --color-cream: #faf9f6;
+  --color-haze: #b4bdc9;
+
   --color-iris-300: #e8872b;
   --color-iris-400: #e8872b;
   --color-iris-500: #e8872b;
@@ -143,6 +148,19 @@
   box-shadow:
     0 1px 3px rgba(27, 42, 74, 0.06),
     0 8px 24px -12px rgba(27, 42, 74, 0.12);
+}
+
+@utility glass-night {
+  background: #162035;
+  border: 1px solid rgba(250, 249, 246, 0.08);
+  color: #faf9f6;
+  box-shadow:
+    0 1px 3px rgba(16, 24, 40, 0.2),
+    0 18px 40px -18px rgba(16, 24, 40, 0.55);
+}
+
+.glass-night .eyebrow {
+  color: #e8872b;
 }
 
 @utility hairline {

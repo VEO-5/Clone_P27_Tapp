@@ -101,6 +101,7 @@ Each employee has a persistent page at `/my-tickets`. They sign in with the work
 | A6 | Search | Type part of a name, email, title, or reference | Table filters to matching rows |
 | A7 | Status filter | Filter to "In progress" | Only in-progress tickets listed; filter reflected in the URL |
 | A8 | Priority change | Set a ticket to Urgent | Persists after reload; `priority_changed` event added |
+| A8b | Queue status change | On `/admin`, change a row's status dropdown | Saves without opening the ticket; employee My tickets / Track show the new status and a timeline event |
 | A9 | Status workflow | Move Open → In progress → Resolved | Badge updates, `resolved_at` stamped, timeline records each change |
 | A10 | Resolution email | Set a ticket to Resolved | Email sent when `RESEND_API_KEY` is set; otherwise it logs and the request still succeeds |
 | A11 | Agent reply | Post a reply | Appears on both the admin and employee timelines |

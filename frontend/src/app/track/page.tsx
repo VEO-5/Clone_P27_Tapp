@@ -53,6 +53,23 @@ export default async function TrackPage({
         </Suspense>
       </Panel>
 
+      <div className="mt-6 grid gap-3 sm:grid-cols-2">
+        <Panel tone="night" className="p-5">
+          <p className="eyebrow mb-2">By reference</p>
+          <p className="text-[13.5px] font-semibold text-cream">Have a PRL- code?</p>
+          <p className="mt-1 text-[13px] leading-relaxed text-haze">
+            Paste it above and you&apos;ll land on that ticket&apos;s live status and timeline.
+          </p>
+        </Panel>
+        <Panel tone="night" className="p-5">
+          <p className="eyebrow mb-2">By email</p>
+          <p className="text-[13.5px] font-semibold text-cream">See every ticket</p>
+          <p className="mt-1 text-[13px] leading-relaxed text-haze">
+            Enter the work email you submitted with to open your inbox on this device.
+          </p>
+        </Panel>
+      </div>
+
       {email && (
         <section className="mt-8" aria-live="polite">
           {tickets && tickets.length > 0 ? (
@@ -66,8 +83,9 @@ export default async function TrackPage({
               ))}
             </div>
           ) : (
-            <Panel>
+            <Panel tone="night">
               <EmptyState
+                tone="night"
                 icon={<Inbox className="size-5" aria-hidden />}
                 title="No tickets for that email"
                 description="Check the address you used when you submitted, or look the ticket up with its PRL- reference instead."
@@ -78,8 +96,9 @@ export default async function TrackPage({
       )}
 
       {ref && !isValidReference(ref) && (
-        <Panel className="mt-8">
+        <Panel tone="night" className="mt-8">
           <EmptyState
+            tone="night"
             icon={<SearchX className="size-5" aria-hidden />}
             title="That doesn't look like a reference"
             description="References look like PRL-7K4M2X. You can also search by the email you used."

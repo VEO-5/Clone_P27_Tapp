@@ -32,13 +32,14 @@ export default async function AdminTicketPage({
   if (!ticket) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-20 sm:px-6">
-        <Panel>
+        <Panel tone="night">
           <EmptyState
+            tone="night"
             icon={<SearchX className="size-5" aria-hidden />}
             title="Ticket not found"
             description="It may have been removed, or the link is stale."
             action={
-              <LinkButton href="/admin" variant="secondary">
+              <LinkButton href="/admin" variant="night">
                 Back to the desk
               </LinkButton>
             }
@@ -106,13 +107,17 @@ export default async function AdminTicketPage({
             </section>
             <section>
               <p className="eyebrow mb-4">Timeline</p>
-              <Timeline events={ticket.events} />
+              <Timeline events={ticket.events} viewer="support" />
             </section>
           </div>
         </Panel>
 
-        <Panel className="p-6 lg:sticky lg:top-24">
-          <p className="eyebrow mb-4">Triage</p>
+        <Panel tone="night" lit className="p-6 lg:sticky lg:top-24">
+          <p className="eyebrow mb-2">Update this ticket</p>
+          <p className="mb-4 text-[13px] leading-relaxed text-haze">
+            Status and replies are saved to the same record the employee sees on My tickets and
+            Track.
+          </p>
           <AdminTicketActions ticket={ticket} />
         </Panel>
       </div>

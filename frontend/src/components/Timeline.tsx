@@ -19,9 +19,11 @@ const EVENT_ICONS: Record<TicketEventType, typeof Sparkles> = {
 export function Timeline({
   events,
   className,
+  viewer = "employee",
 }: {
   events: TicketEvent[];
   className?: string;
+  viewer?: "employee" | "support";
 }) {
   const ordered = [...events].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
@@ -36,6 +38,10 @@ export function Timeline({
       {ordered.map((event, index) => {
         const Icon = EVENT_ICONS[event.type];
         const isReply = event.type === "reply";
+        const actorLabel =
+          event.actor === "employee" && viewer === "support"
+            ? "Employee"
+            : ACTOR_LABELS[event.actor];
 
         return (
           <li key={event.id} className="flex gap-4">
@@ -50,7 +56,7 @@ export function Timeline({
               >
                 {isReply ? (
                   <span className="text-[10px] font-semibold tracking-wide">
-                    {initials(ACTOR_LABELS[event.actor])}
+                    {initials(actorLabel)}
                   </span>
                 ) : (
                   <Icon className="size-3.5" aria-hidden />
@@ -63,9 +69,7 @@ export function Timeline({
 
             <div className={cn("min-w-0 flex-1", index < ordered.length - 1 && "pb-6")}>
               <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                <span className="text-[13px] font-semibold text-pearl">
-                  {ACTOR_LABELS[event.actor]}
-                </span>
+                <span className="text-[13px] font-semibold text-pearl">{actorLabel}</span>
                 <time
                   dateTime={event.createdAt}
                   className="text-[11.5px] text-fog"

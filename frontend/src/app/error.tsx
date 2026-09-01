@@ -14,8 +14,9 @@ export default function AppError({
 
   return (
     <div className="mx-auto max-w-xl px-4 py-20 sm:px-6">
-      <Panel>
+      <Panel tone="night">
         <EmptyState
+          tone="night"
           title={schemaMissing ? "Database is not set up yet" : "Something went wrong"}
           description={
             schemaMissing
@@ -31,7 +32,7 @@ export default function AppError({
               >
                 Try again
               </button>
-              <LinkButton href="/" variant="secondary">
+              <LinkButton href="/" variant="night">
                 Back home
               </LinkButton>
             </div>
