@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { Select } from "@/components/ui/Form";
 import { patchAdminTicket } from "@/lib/adminTicket";
@@ -18,15 +18,12 @@ import { cn } from "@/lib/utils";
 
 export function AdminQueueActions({ ticket }: { ticket: Ticket }) {
   const router = useRouter();
+  // Local draft state, seeded from props. Parents remount per ticket version
+  // (key includes updatedAt), so no sync effect is needed.
   const [status, setStatus] = useState<TicketStatus>(ticket.status);
   const [priority, setPriority] = useState<TicketPriority>(ticket.priority);
   const [saving, setSaving] = useState<"status" | "priority" | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setStatus(ticket.status);
-    setPriority(ticket.priority);
-  }, [ticket.status, ticket.priority, ticket.updatedAt]);
 
   const apply = async (
     field: "status" | "priority",
@@ -50,7 +47,7 @@ export function AdminQueueActions({ ticket }: { ticket: Ticket }) {
 
   return (
     <div
-      className="flex flex-col gap-2"
+      className="flex flex-col gap-1.5"
       onClick={(event) => event.stopPropagation()}
       onKeyDown={(event) => event.stopPropagation()}
     >
@@ -62,7 +59,7 @@ export function AdminQueueActions({ ticket }: { ticket: Ticket }) {
         value={status}
         disabled={saving !== null}
         aria-busy={saving === "status" || undefined}
-        className={cn("h-11 min-w-[10.5rem] text-[13px]", saving === "status" && "opacity-70")}
+        className={cn("h-8 min-w-[9rem] text-xs", saving === "status" && "opacity-70")}
         onChange={(event) => {
           const value = event.target.value as TicketStatus;
           if (value === status) return;
@@ -85,7 +82,7 @@ export function AdminQueueActions({ ticket }: { ticket: Ticket }) {
         value={priority}
         disabled={saving !== null}
         aria-busy={saving === "priority" || undefined}
-        className={cn("h-11 min-w-[10.5rem] text-[13px]", saving === "priority" && "opacity-70")}
+        className={cn("h-8 min-w-[9rem] text-xs", saving === "priority" && "opacity-70")}
         onChange={(event) => {
           const value = event.target.value as TicketPriority;
           if (value === priority) return;
@@ -100,9 +97,11 @@ export function AdminQueueActions({ ticket }: { ticket: Ticket }) {
         ))}
       </Select>
 
-      <p aria-live="polite" className="min-h-4 text-[12px] text-rose-400">
-        {error}
-      </p>
+      {error && (
+        <p aria-live="polite" className="text-[12px] text-rose-400">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

@@ -3,8 +3,8 @@
 /* ==========================================================================
    Pearl 27 — Sphere Support Desk
 
-   Tokens taken from pearl27.com: cream paper, navy ink, copper accent,
-   Cormorant Garamond + JetBrains Mono.
+   Tokens taken from pearl27.com: cream paper, navy ink, copper accent.
+   Type: Inter (body/UI) + Plus Jakarta Sans (headings) + JetBrains Mono (refs).
    ========================================================================== */
 
 @theme {
@@ -36,9 +36,9 @@
   --color-gold-400: #e8872b;
   --color-jade-400: #2f7a4f;
 
-  --font-sans: var(--font-cormorant), Georgia, "Times New Roman", serif;
+  --font-sans: var(--font-inter), ui-sans-system, -apple-system, "Segoe UI", system-ui, sans-serif;
   --font-mono: var(--font-jetbrains), "Courier New", monospace;
-  --font-display: var(--font-cormorant), Georgia, "Times New Roman", serif;
+  --font-display: var(--font-jakarta), var(--font-inter), ui-sans-system, system-ui, sans-serif;
 
   --animate-aurora: aurora 26s ease-in-out infinite;
   --animate-rise: rise 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -101,6 +101,9 @@
     color-scheme: light;
     scroll-behavior: smooth;
     -webkit-tap-highlight-color: transparent;
+    /* Reserve the scrollbar gutter everywhere so routes with window scroll
+       (ticket detail) and locked shells (/admin) share the same width. */
+    scrollbar-gutter: stable;
   }
 
   body {
@@ -129,7 +132,9 @@
   h2,
   h3 {
     text-wrap: balance;
-    font-weight: 500;
+    font-weight: 650;
+    font-family: var(--font-display);
+    letter-spacing: -0.025em;
   }
 
   p {
@@ -176,15 +181,15 @@
 
 @utility text-iridescent {
   color: var(--color-pearl);
-  font-style: italic;
+  font-style: normal;
 }
 
 @utility eyebrow {
-  font-family: var(--font-mono);
-  font-size: 0.625rem;
-  font-weight: 400;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: none;
   color: var(--color-fog);
 }
 

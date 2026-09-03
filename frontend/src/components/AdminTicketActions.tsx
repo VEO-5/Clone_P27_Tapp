@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { AlertTriangle, CheckCircle2, Send } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/Button";
 import { Field, Select, Textarea } from "@/components/ui/Form";
@@ -28,10 +28,14 @@ export function AdminTicketActions({ ticket }: { ticket: TicketDetail }) {
   const [notice, setNotice] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
+  // Resync the dropdowns when a fresh ticket version arrives (e.g. after
+  // router.refresh()), without touching the in-progress reply draft.
+  const [seenVersion, setSeenVersion] = useState(ticket.updatedAt);
+  if (seenVersion !== ticket.updatedAt) {
+    setSeenVersion(ticket.updatedAt);
     setStatus(ticket.status);
     setPriority(ticket.priority);
-  }, [ticket.status, ticket.priority, ticket.updatedAt]);
+  }
 
   const next = NEXT_STATUS[status];
 

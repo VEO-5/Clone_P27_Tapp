@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Form";
@@ -20,9 +20,14 @@ export function TicketLookupForm({ autoFocus = false }: { autoFocus?: boolean })
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
-  useEffect(() => {
+  // Reset the spinner when navigation lands (params change) — adjusted during
+  // render from the previous params instead of syncing in an effect.
+  const paramsKey = searchParams.toString();
+  const [seenParams, setSeenParams] = useState(paramsKey);
+  if (seenParams !== paramsKey) {
+    setSeenParams(paramsKey);
     setPending(false);
-  }, [searchParams]);
+  }
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();

@@ -32,7 +32,7 @@ export default function SubmitTicketPage() {
           className="animate-rise mt-5 font-display text-[2.8rem] leading-[1.08] tracking-tight sm:text-6xl"
           style={{ animationDelay: "60ms" }}
         >
-          <span className="italic">Sphere support</span>
+          <span className="tracking-tight">Sphere support</span>
           <br />
           <span className="text-pearl">without the chase.</span>
         </h1>

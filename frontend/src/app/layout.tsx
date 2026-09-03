@@ -1,18 +1,22 @@
 import type { Metadata, Viewport } from "next";
-import { Cormorant_Garamond, JetBrains_Mono } from "next/font/google";
+import { Inter, JetBrains_Mono, Plus_Jakarta_Sans } from "next/font/google";
 
-import { Aurora } from "@/components/Aurora";
-import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
+import { gravatarUrl } from "@/lib/avatar";
 import { getEmployeeSession } from "@/lib/employeeAuth";
 
 import "./globals.css";
 
-const cormorant = Cormorant_Garamond({
-  variable: "--font-cormorant",
+const sans = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  style: ["normal", "italic"],
+  weight: ["400", "500", "600", "700", "800"],
+});
+
+const display = Plus_Jakarta_Sans({
+  variable: "--font-jakarta",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
 });
 
 const jetbrains = JetBrains_Mono({
@@ -47,10 +51,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html
       lang="en"
-      className={`${cormorant.variable} ${jetbrains.variable} h-full antialiased`}
+      className={`${sans.variable} ${display.variable} ${jetbrains.variable} h-full antialiased`}
     >
       <body className="relative flex min-h-full flex-col">
-        <Aurora />
         <div className="relative z-10 flex min-h-full flex-1 flex-col">
           <a
             href="#main"
@@ -58,11 +61,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           >
             Skip to content
           </a>
-          <SiteHeader employeeEmail={employee?.email ?? null} />
+          <SiteHeader
+            employeeEmail={employee?.email ?? null}
+            employeeAvatarUrl={employee?.email ? gravatarUrl(employee.email) : null}
+          />
           <main id="main" className="flex-1">
             {children}
           </main>
-          <SiteFooter />
         </div>
       </body>
     </html>

@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
-import { ArrowRightLeft, KeyRound, MessageSquare } from "lucide-react";
+import { ArrowLeft, ArrowRightLeft, KeyRound, MessageSquare } from "lucide-react";
 
 import { AdminLoginForm } from "@/components/AdminLoginForm";
+import { LinkButton } from "@/components/ui/Button";
 import { Panel } from "@/components/ui/Panel";
 import { isAuthenticated } from "@/lib/adminAuth";
 
@@ -14,6 +15,9 @@ export default async function AdminLoginPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 pb-8 pt-14 sm:px-6 sm:pt-20">
+      <LinkButton href="/" variant="ghost" size="sm" icon={<ArrowLeft className="size-3.5" aria-hidden />} className="mb-6 -ml-3">
+        Back to home
+      </LinkButton>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] lg:items-start">
         <AdminLoginForm />
         <Panel tone="night" lit className="p-6">

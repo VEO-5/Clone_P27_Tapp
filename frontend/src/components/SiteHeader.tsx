@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn, initials } from "@/lib/utils";
 
 const NAV = [
   { href: "/", label: "Submit a ticket" },
@@ -11,8 +12,42 @@ const NAV = [
   { href: "/admin", label: "Support desk" },
 ] as const;
 
-export function SiteHeader({ employeeEmail }: { employeeEmail?: string | null }) {
+function EmployeeAvatar({ email, avatarUrl }: { email: string; avatarUrl: string | null }) {
+  const [failed, setFailed] = useState(false);
+  if (avatarUrl && !failed) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={avatarUrl}
+        alt=""
+        width={28}
+        height={28}
+        onError={() => setFailed(true)}
+        className="size-7 rounded-full border border-ink-700 bg-ink-900 object-cover"
+      />
+    );
+  }
+  return (
+    <span
+      aria-hidden
+      className="grid size-7 place-items-center rounded-full bg-pearl text-[10px] font-semibold text-cream"
+    >
+      {initials(email)}
+    </span>
+  );
+}
+
+export function SiteHeader({
+  employeeEmail,
+  employeeAvatarUrl,
+}: {
+  employeeEmail?: string | null;
+  employeeAvatarUrl?: string | null;
+}) {
   const pathname = usePathname();
+
+  // The desk is a full app shell — sidebar owns the logo, topbar owns utilities.
+  if (pathname.startsWith("/admin")) return null;
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -59,12 +94,15 @@ export function SiteHeader({ employeeEmail }: { employeeEmail?: string | null })
           </nav>
 
           {employeeEmail && (
-            <p
-              className="hidden max-w-[10rem] truncate font-mono text-[10px] text-fog lg:block"
-              title={employeeEmail}
-            >
-              {employeeEmail}
-            </p>
+            <span className="hidden items-center gap-2 lg:flex">
+              <EmployeeAvatar email={employeeEmail} avatarUrl={employeeAvatarUrl ?? null} />
+              <p
+                className="max-w-[10rem] truncate font-mono text-[10px] text-fog"
+                title={employeeEmail}
+              >
+                {employeeEmail}
+              </p>
+            </span>
           )}
         </div>
       </div>
