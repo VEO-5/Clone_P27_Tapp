@@ -1,0 +1,22 @@
+{
+  "name": "@pearl27/api-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "generate": "echo 'generate from OpenAPI spec (API authoritative once apps/api exists)'"
+  },
+  "dependencies": {
+    "@pearl27/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "typescript": "^5",
+    "vitest": "^3.2.4"
+  }
+}

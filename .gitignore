@@ -19,6 +19,6 @@ next-env.d.ts
 .DS_Store
 *.pem
 
-# Frontend
-frontend/node_modules/
-frontend/.env
+# Web app local env (example is committed)
+apps/web/.env
+apps/web/.env.local
