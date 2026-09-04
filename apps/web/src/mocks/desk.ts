@@ -47,7 +47,7 @@ const SEED: SeedSpec[] = [
   { title: "Password reset not arriving", status: "pending", priority: "high", categoryId: "account_access", assigneeIdx: null, ageHours: 12, slaHoursFromNow: 4, unread: 0, requester: "Ama Serwaa", previousRelease: { status: "in_progress", agentName: "Ada Osei", releasedAt: iso(50), reason: "Handing over shift" } },
   { title: "Invoice PDF export broken", status: "resolved", priority: "medium", categoryId: "sphere_app", assigneeIdx: 0, ageHours: 200, slaHoursFromNow: null, unread: 0, requester: "Kojo Antwi" },
   { title: "Monitor flickers at 4K", status: "open", priority: "low", categoryId: "hardware", assigneeIdx: 3, ageHours: 60, slaHoursFromNow: 30, unread: 1, requester: "Efua Adu" },
-  { title: "Calendar double-bookings", status: "in_progress", priority: "medium", categoryId: "email", assigneeIdx: 0, ageHours: 80, slaHoursFromNow: 6, unread: 0, requester: "Ama Serwaa" },
+  { title: "Calendar double-bookings", status: "pending", priority: "medium", categoryId: "email", assigneeIdx: 0, ageHours: 80, slaHoursFromNow: 6, unread: 0, requester: "Ama Serwaa" },
   { title: "VPN client won't install on Mac", status: "pending", priority: "medium", categoryId: "network", assigneeIdx: null, ageHours: 20, slaHoursFromNow: 24, unread: 0, requester: "Yaw Boateng" },
   { title: "Sphere notifications silent", status: "open", priority: "high", categoryId: "sphere_app", assigneeIdx: 4, ageHours: 34, slaHoursFromNow: -1, unread: 2, requester: "Kojo Antwi" },
   { title: "Desk phone no dial tone", status: "resolved", priority: "low", categoryId: "hardware", assigneeIdx: 0, ageHours: 300, slaHoursFromNow: null, unread: 0, requester: "Efua Adu" },
@@ -93,6 +93,28 @@ let tickets: DeskTicket[] = seedTickets();
 
 export function resetDeskStore() {
   tickets = seedTickets();
+}
+
+/**
+ * Server-side Open transition: fetching the detail as the assignee flips a
+ * Pending ticket to Open. Returns the ticket plus whether it just flipped.
+ */
+export function openAsAssignee(id: string, viewerId: string): { ticket: DeskTicket; justOpened: boolean } | null {
+  const ticket = tickets.find((t) => t.id === id);
+  if (!ticket) return null;
+  let justOpened = false;
+  if (ticket.assignee?.id === viewerId && ticket.status === "pending") {
+    ticket.status = "open";
+    ticket.version += 1;
+    ticket.updatedAt = new Date().toISOString();
+    justOpened = true;
+  }
+  return { ticket: listDeskTickets().find((t) => t.id === id)!, justOpened };
+}
+
+/** Raw mutable handle for the send flow (mock server-side only). */
+export function mutableDeskTicket(id: string): DeskTicket | undefined {
+  return tickets.find((t) => t.id === id);
 }
 
 export function listDeskTickets(): DeskTicket[] {

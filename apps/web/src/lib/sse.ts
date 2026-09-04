@@ -77,6 +77,7 @@ export function useDeskEvents(enabled: boolean): DeskEvents {
       try {
         const payload = JSON.parse(event.data) as SseMessageCreated;
         void queryClient.invalidateQueries({ queryKey: ["desk", "tickets"] });
+        void queryClient.invalidateQueries({ queryKey: ["desk", "ticket"] });
         void queryClient.invalidateQueries({ queryKey: ["desk", "activity"] });
         void payload;
       } catch {

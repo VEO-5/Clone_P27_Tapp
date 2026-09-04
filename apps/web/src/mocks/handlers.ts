@@ -4,7 +4,6 @@ import {
   addAgent,
   deactivateAgent,
   getMockProfile,
-  makeTicket,
   mockAgents,
   setMockSession,
 } from "./fixtures";
@@ -32,6 +31,12 @@ import {
   queryDeskTickets,
   releaseTicket,
 } from "./desk";
+import {
+  getDeskDetail,
+  heartbeat,
+  pushLiveEmployeeMessage,
+  sendToTicket,
+} from "./conversations";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
@@ -192,14 +197,14 @@ export const handlers = [
     );
   }),
   http.get(`${API}/desk/tickets/:id`, ({ params }) => {
-    const ticket = listDeskTickets().find((t) => t.id === String(params.id));
-    if (!ticket) {
+    const detail = getDeskDetail(String(params.id));
+    if ("error" in detail) {
       return HttpResponse.json(
         { error: { code: "NOT_FOUND", message: "Ticket not found." } },
         { status: 404 },
       );
     }
-    return HttpResponse.json({ ...ticket, events: [], messages: [], attachments: [] });
+    return HttpResponse.json(detail);
   }),
   http.post(`${API}/desk/tickets/:id/claim`, ({ params }) => {
     try {
@@ -240,14 +245,45 @@ export const handlers = [
     }
     return HttpResponse.json(ticket);
   }),
-  http.post(`${API}/desk/tickets/:id/send`, ({ params }) =>
-    HttpResponse.json({
-      ...makeTicket({ id: String(params.id), status: "open" }),
-      events: [],
-      messages: [],
-      attachments: [],
-    }),
-  ),
+  http.post(`${API}/desk/tickets/:id/send`, async ({ params, request }) => {
+    const body = (await request.json().catch(() => ({}))) as {
+      text?: string;
+      status?: "open" | "in_progress" | "resolved";
+      internal?: boolean;
+      priority?: "low" | "medium" | "high" | "urgent";
+      version?: number;
+    };
+    // Mock role travels on the session (same pattern as the desk store).
+    const profile = getMockProfile();
+    const role = profile?.role ?? "agent";
+    const result = sendToTicket(String(params.id), { ...body, version: Number(body.version ?? -1) }, role);
+    if (!result.ok) {
+      if (result.code === "NOT_FOUND") {
+        return HttpResponse.json({ error: { code: "NOT_FOUND", message: "Ticket not found." } }, { status: 404 });
+      }
+      if (result.code === "LOCKED_BY_OTHER") {
+        return HttpResponse.json(
+          { error: { code: "LOCKED_BY_OTHER", message: `Locked to ${result.ownerName} · view only`, ownerName: result.ownerName } },
+          { status: 403 },
+        );
+      }
+      if (result.code === "VERSION_CONFLICT") {
+        return HttpResponse.json(
+          { error: { code: "VERSION_CONFLICT", message: "This ticket changed while you were typing.", detail: result.detail } },
+          { status: 409 },
+        );
+      }
+      return HttpResponse.json(
+        { error: { code: "VALIDATION_FAILED", message: result.message, fieldErrors: {} } },
+        { status: 422 },
+      );
+    }
+    return HttpResponse.json(result.detail);
+  }),
+  http.post(`${API}/desk/tickets/:id/presence`, ({ params }) => {
+    heartbeat(String(params.id));
+    return new HttpResponse(null, { status: 204 });
+  }),
   http.get(`${API}/desk/agents`, () => HttpResponse.json(deskAgents())),
   http.get(`${API}/desk/activity`, () => HttpResponse.json({ items: deskActivity(), nextCursor: null })),
   http.get(`${API}/desk/events`, () => {
@@ -272,6 +308,9 @@ export const handlers = [
               status: first.status,
               assignee: first.assignee,
             });
+            encode("presence", { ticketId: "t-desk-1", viewers: ["Ada Osei"] });
+            const live = pushLiveEmployeeMessage();
+            if (live) encode("message.created", live);
           } catch {
             // client went away — the interval cleanup handles the rest
           }
