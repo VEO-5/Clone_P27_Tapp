@@ -1,11 +1,22 @@
 import { http, HttpResponse } from "msw";
 
-import { makeTicket, makeTicketList, mockAgents, mockProfile } from "./fixtures";
+import {
+  addAgent,
+  deactivateAgent,
+  getMockProfile,
+  makeTicket,
+  makeTicketList,
+  mockAgents,
+} from "./fixtures";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
 export const handlers = [
-  http.get(`${API}/auth/me`, () => HttpResponse.json(mockProfile)),
+  http.get(`${API}/auth/me`, () => {
+    const profile = getMockProfile();
+    if (!profile) return HttpResponse.json({ error: { code: "UNAUTHENTICATED", message: "Sign in again." } }, { status: 401 });
+    return HttpResponse.json(profile);
+  }),
   http.post(`${API}/auth/logout`, () => new HttpResponse(null, { status: 204 })),
   http.get(`${API}/categories`, () =>
     HttpResponse.json([
@@ -74,5 +85,32 @@ export const handlers = [
   http.get(`${API}/desk/activity`, () => HttpResponse.json({ items: [], nextCursor: null })),
   http.get(`${API}/admin/dashboard`, () => HttpResponse.json({ cards: {}, widgets: {} })),
   http.get(`${API}/admin/agents`, () => HttpResponse.json(mockAgents)),
+  http.post(`${API}/admin/agents`, async ({ request }) => {
+    const body = (await request.json().catch(() => ({}))) as { email?: string };
+    const email = String(body.email ?? "").trim().toLowerCase();
+    if (!email.endsWith("@pearl27.com") || !email.includes("@")) {
+      return HttpResponse.json(
+        {
+          error: {
+            code: "VALIDATION_FAILED",
+            message: "Use a pearl27.com address",
+            fieldErrors: { email: "Use your pearl27.com address" },
+          },
+        },
+        { status: 422 },
+      );
+    }
+    return HttpResponse.json(addAgent(email), { status: 201 });
+  }),
+  http.delete(`${API}/admin/agents/:id`, ({ params }) => {
+    const agent = deactivateAgent(String(params.id));
+    if (!agent) {
+      return HttpResponse.json(
+        { error: { code: "NOT_FOUND", message: "Agent not found" } },
+        { status: 404 },
+      );
+    }
+    return HttpResponse.json(agent);
+  }),
   http.get(`${API}/admin/audit`, () => HttpResponse.json({ items: [], nextCursor: null })),
 ];

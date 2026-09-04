@@ -56,10 +56,12 @@ export function SiteHeader({
   employeeEmail,
   employeeAvatarUrl,
   role = "signedOut",
+  action,
 }: {
   employeeEmail?: string | null;
   employeeAvatarUrl?: string | null;
   role?: keyof typeof NAV_BY_ROLE;
+  action?: React.ReactNode;
 }) {
   const pathname = usePathname();
   const NAV = NAV_BY_ROLE[role];
@@ -120,8 +122,10 @@ export function SiteHeader({
               >
                 {employeeEmail}
               </p>
+              {action}
             </span>
           )}
+          {employeeEmail && <span className="lg:hidden">{action}</span>}
         </div>
       </div>
     </header>

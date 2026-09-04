@@ -1,7 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono, Plus_Jakarta_Sans } from "next/font/google";
 
-import { SiteHeader } from "@/components/SiteHeader";
+import { AppShell } from "@/components/layout/AppShell";
+import { MockProvider } from "@/components/MockProvider";
+import { SessionHeader } from "@/components/SessionHeader";
 
 import "./globals.css";
 
@@ -57,10 +59,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           >
             Skip to content
           </a>
-          <SiteHeader employeeEmail={null} employeeAvatarUrl={null} />
-          <main id="main" className="flex-1">
-            {children}
-          </main>
+          <AppShell>
+            <MockProvider>
+              <SessionHeader />
+              <main id="main" className="flex-1">
+                {children}
+              </main>
+            </MockProvider>
+          </AppShell>
         </div>
       </body>
     </html>
