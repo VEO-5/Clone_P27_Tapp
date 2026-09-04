@@ -1,27 +1,39 @@
 "use client";
 
-import { ArrowRight, CheckCircle2, MailCheck, MailWarning, Paperclip, Plus } from "lucide-react";
+import type { Ticket } from "@pearl27/contracts";
+import { ArrowRight, CheckCircle2, MessageCircle, Paperclip, Plus, RotateCcw } from "lucide-react";
 
 import { CopyButton } from "@/components/CopyButton";
 import { Button, LinkButton } from "@/components/ui/Button";
 import { StatusBadge } from "@/components/ui/Badge";
 import { Panel } from "@/components/ui/Panel";
-import { CATEGORY_LABELS, type TicketDetail } from "@/lib/types";
 import { formatDateTime } from "@/lib/utils";
 
+export interface UploadState {
+  fileName: string;
+  status: "uploading" | "done" | "error";
+  progress: number;
+}
+
 /**
- * The confirmation state required by the brief — a clear success screen with a
- * reference the employee can quote, plus a direct route into tracking.
+ * Confirmation after POST /tickets: reference, Pending chip, Chat handoff,
+ * per-file upload states with retry. Failures never lose the ticket (FE-2.7).
  */
 export function TicketConfirmation({
   ticket,
-  emailSent,
+  uploads,
+  onRetry,
   onReset,
 }: {
-  ticket: TicketDetail;
-  emailSent: boolean;
+  ticket: Ticket;
+  uploads: UploadState[];
+  onRetry: (index: number) => void;
   onReset: () => void;
 }) {
+  const done = uploads.filter((u) => u.status === "done").length;
+  const failed = uploads.filter((u) => u.status === "error");
+  const scanning = uploads.filter((u) => u.status !== "error").length - done;
+
   return (
     <Panel lit className="animate-rise overflow-hidden">
       <div className="flex flex-col items-center gap-5 px-6 pb-8 pt-10 text-center sm:px-10">
@@ -35,68 +47,87 @@ export function TicketConfirmation({
             Your ticket is with System Support
           </h2>
           <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-mist">
-            Keep the reference below. You&apos;re signed into My tickets on this device — come back
-            any time with the same work email.
+            Talk to support in Google Chat — we&apos;ve sent you a message there.
           </p>
         </div>
 
         <div className="glass-night flex w-full flex-col items-center gap-3 rounded-[4px] px-6 py-6">
           <p className="eyebrow">Ticket reference</p>
-          <p className="mono-ref text-3xl font-medium text-cream sm:text-4xl">
-            {ticket.reference}
-          </p>
+          <p className="mono-ref text-3xl font-medium text-cream sm:text-4xl">{ticket.reference}</p>
           <CopyButton
             value={ticket.reference}
             label="Copy reference"
             className="border-cream/20 bg-transparent text-cream hover:border-iris-400/50 hover:bg-white/8 hover:text-cream"
           />
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <StatusBadge status={ticket.status} size="sm" />
+          </div>
         </div>
 
-        <dl className="grid w-full gap-px overflow-hidden rounded-xl border border-ink-700 bg-ink-700 sm:grid-cols-3">
-          {[
-            { label: "Status", value: <StatusBadge status={ticket.status} size="sm" /> },
-            { label: "Category", value: CATEGORY_LABELS[ticket.category] },
-            { label: "Submitted", value: formatDateTime(ticket.createdAt) },
-          ].map((row) => (
-            <div key={row.label} className="flex flex-col gap-1.5 bg-ink-850 px-4 py-3 text-left">
-              <dt className="text-[11px] uppercase tracking-[0.14em] text-fog">{row.label}</dt>
-              <dd className="text-[13px] font-medium text-pearl-dim">{row.value}</dd>
-            </div>
-          ))}
-        </dl>
+        {ticket.chatDmUrl && (
+          <a
+            href={ticket.chatDmUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex min-h-11 items-center gap-2 rounded-[2px] bg-iris-500 px-7 text-sm font-medium text-white hover:bg-iris-600"
+          >
+            <MessageCircle className="size-4" aria-hidden />
+            Open Google Chat
+          </a>
+        )}
 
-        <div className="flex flex-col items-center gap-2 text-[12.5px] text-fog">
-          <p className="flex items-center gap-2">
-            {emailSent ? (
-              <>
-                <MailCheck className="size-3.5 text-jade-400" aria-hidden />
-                Confirmation emailed to {ticket.employeeEmail}
-              </>
-            ) : (
-              <>
-                <MailWarning className="size-3.5 text-gold-400" aria-hidden />
-                Email is in log-only mode — your ticket is saved and tracked
-              </>
-            )}
-          </p>
-          {ticket.attachments.length > 0 && (
-            <p className="flex items-center gap-2">
+        {uploads.length > 0 && (
+          <div className="w-full rounded-[4px] border border-ink-700 p-4 text-left" aria-live="polite">
+            <p className="flex items-center gap-2 text-[13px] font-medium text-pearl-dim">
               <Paperclip className="size-3.5" aria-hidden />
-              {ticket.attachments.length} file
-              {ticket.attachments.length === 1 ? "" : "s"} attached
+              {failed.length === 0
+                ? `${done} of ${uploads.length} files attached${scanning > 0 ? " · scanning" : ""}`
+                : `${done} of ${uploads.length} files attached · ${failed.length} failed`}
             </p>
-          )}
-        </div>
+            <ul className="mt-3 flex flex-col gap-2">
+              {uploads.map((upload, index) => (
+                <li key={`${upload.fileName}-${index}`} className="flex items-center gap-3">
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[13px] text-pearl-dim">{upload.fileName}</span>
+                    {upload.status === "uploading" && (
+                      <span
+                        className="mt-1 block h-1 overflow-hidden rounded-full bg-ink-700"
+                        role="progressbar"
+                        aria-valuenow={upload.progress}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-label={`${upload.fileName} upload progress`}
+                      >
+                        <span className="block h-full bg-iris-500 transition-all" style={{ width: `${upload.progress}%` }} />
+                      </span>
+                    )}
+                    {upload.status === "error" && (
+                      <span className="mt-0.5 block text-[12.5px] text-rose-400">
+                        Upload failed — your ticket is saved.
+                      </span>
+                    )}
+                  </span>
+                  {upload.status === "done" && <CheckCircle2 className="size-4 shrink-0 text-jade-400" aria-label="Uploaded" />}
+                  {upload.status === "error" && (
+                    <button
+                      type="button"
+                      onClick={() => onRetry(index)}
+                      className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-[2px] border border-ink-600 px-3 text-[13px] font-medium text-pearl hover:border-iris-400"
+                    >
+                      <RotateCcw className="size-3.5" aria-hidden />
+                      Retry
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 text-[12px] text-fog">Submitted {formatDateTime(ticket.createdAt)}</p>
+          </div>
+        )}
 
         <div className="mt-2 flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
-          <LinkButton
-            href="/my-tickets"
-            trailingIcon={<ArrowRight className="size-4" aria-hidden />}
-          >
-            Open my tickets
-          </LinkButton>
-          <LinkButton href={`/track/${ticket.reference}`} variant="secondary">
-            Just this ticket
+          <LinkButton href="/tickets" trailingIcon={<ArrowRight className="size-4" aria-hidden />}>
+            View ticket
           </LinkButton>
           <Button variant="ghost" onClick={onReset} icon={<Plus className="size-4" />}>
             Submit another

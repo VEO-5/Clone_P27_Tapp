@@ -1,13 +1,26 @@
 import Link from "next/link";
+import type { Ticket } from "@pearl27/contracts";
 
 import { PriorityBadge, StatusBadge } from "@/components/ui/Badge";
-import { CATEGORY_LABELS, type Ticket } from "@/lib/types";
 import { formatRelative } from "@/lib/utils";
 
-export function TicketCard({ ticket, href }: { ticket: Ticket; href: string }) {
+const CATEGORY_NAMES: Record<string, string> = {
+  account_access: "Sphere account access",
+  sphere_app: "Sphere app issue",
+  hardware: "Hardware / device",
+  network: "Network / VPN",
+  email: "Email / calendar",
+  other: "Something else",
+};
+
+export function categoryName(id: string): string {
+  return CATEGORY_NAMES[id] ?? id;
+}
+
+export function TicketCard({ ticket }: { ticket: Ticket }) {
   return (
     <Link
-      href={href}
+      href={`/tickets/${ticket.reference}`}
       className="glass-night block rounded-[4px] p-4 transition-colors duration-200 hover:border-cream/20"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -18,7 +31,8 @@ export function TicketCard({ ticket, href }: { ticket: Ticket; href: string }) {
       </div>
       <p className="mt-2 text-[15px] font-semibold tracking-tight text-cream">{ticket.title}</p>
       <p className="mt-1 text-[12.5px] text-haze">
-        {ticket.employeeName} · {CATEGORY_LABELS[ticket.category]}
+        {ticket.handlingAgent ? `${ticket.handlingAgent.name} · ` : "Waiting for an agent · "}
+        {categoryName(ticket.categoryId)}
       </p>
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <StatusBadge status={ticket.status} size="sm" surface="night" />

@@ -1,8 +1,21 @@
 import "@testing-library/jest-dom/vitest";
-import { afterAll, afterEach, beforeAll } from "vitest";
+import { afterAll, afterEach, beforeAll, vi } from "vitest";
 
+import { resetEmployeeStore } from "@/mocks/employee";
+import { resetAgents, setMockSession } from "@/mocks/fixtures";
 import { server } from "@/mocks/server";
 
-beforeAll(() => server.listen({ onUnhandledRequest: "warn" }));
-afterEach(() => server.resetHandlers());
-afterAll(() => server.close());
+beforeAll(() => {
+  server.listen({ onUnhandledRequest: "warn" });
+  // jsdom has no blob URLs — UploadZone previews need the stub.
+  if (!URL.createObjectURL) {
+    URL.createObjectURL = vi.fn(() => "blob:mock") as unknown as typeof URL.createObjectURL;
+    URL.revokeObjectURL = vi.fn();
+  }
+});
+afterEach(() => {
+  server.resetHandlers();
+  resetEmployeeStore();
+  resetAgents();
+  setMockSession("employee");
+});afterAll(() => server.close());

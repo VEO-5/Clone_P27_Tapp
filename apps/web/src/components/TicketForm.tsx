@@ -1,29 +1,26 @@
 "use client";
 
+import { createTicketSchema, type Ticket } from "@pearl27/contracts";
 import { AlertTriangle, Send } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { z } from "zod";
 
-import { TicketConfirmation } from "@/components/TicketConfirmation";
+import { TicketConfirmation, type UploadState } from "@/components/TicketConfirmation";
 import { UploadZone } from "@/components/UploadZone";
 import { Button } from "@/components/ui/Button";
 import { CharCount, Field, Input, Select, Textarea } from "@/components/ui/Form";
 import { Panel } from "@/components/ui/Panel";
-import {
-  CATEGORY_LABELS,
-  PRIORITY_LABELS,
-  TICKET_CATEGORIES,
-  TICKET_PRIORITIES,
-  type TicketDetail,
-} from "@/lib/types";
-import { createTicketSchema, fieldErrorsFrom } from "@/lib/validation";
+import { useSession } from "@/features/auth/useSession";
+import { apiFetch } from "@/lib/api";
+import { PRIORITY_LABELS } from "@/lib/types";
+
+import { fieldErrorsFromApi, uploadFileWithProgress, type PresignedUpload } from "@/features/tickets/uploads";
 
 const EMPTY_FORM = {
-  employeeName: "",
-  employeeEmail: "",
   title: "",
   description: "",
-  category: "account_access",
-  priority: "medium",
+  categoryId: "",
+  priority: "medium" as const,
 };
 
 type FormValues = typeof EMPTY_FORM;
@@ -31,19 +28,41 @@ type FormValues = typeof EMPTY_FORM;
 const TITLE_MAX = 140;
 const DESCRIPTION_MAX = 5000;
 
+function flattenZod(error: z.ZodError): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const issue of error.issues) {
+    const key = String(issue.path[0] ?? "form");
+    result[key] ??= issue.message;
+  }
+  return result;
+}
+
 export function TicketForm() {
+  const session = useSession();
   const [values, setValues] = useState<FormValues>(EMPTY_FORM);
   const [files, setFiles] = useState<File[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState<{ ticket: TicketDetail; emailSent: boolean } | null>(null);
+  const [result, setResult] = useState<{ ticket: Ticket; uploads: UploadState[] } | null>(null);
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch<{ id: string; name: string }[]>("/categories")
+      .then((list) => {
+        if (!cancelled) setCategories(list);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const formRef = useRef<HTMLFormElement>(null);
 
   const set = <K extends keyof FormValues>(key: K, value: FormValues[K]) => {
     setValues((current) => ({ ...current, [key]: value }));
-    // Clear the field's error as soon as the employee starts fixing it.
     setErrors((current) => {
       if (!current[key]) return current;
       const next = { ...current };
@@ -55,9 +74,7 @@ export function TicketForm() {
   const focusFirstError = (fieldErrors: Record<string, string>) => {
     const first = Object.keys(fieldErrors)[0];
     if (!first) return;
-    formRef.current
-      ?.querySelector<HTMLElement>(`[name="${first}"]`)
-      ?.focus({ preventScroll: false });
+    formRef.current?.querySelector<HTMLElement>(`[name="${first}"]`)?.focus();
   };
 
   const reset = () => {
@@ -68,56 +85,113 @@ export function TicketForm() {
     setResult(null);
   };
 
+  async function uploadOne(ticketId: string, file: File, onProgress: (p: number) => void): Promise<UploadState> {
+    const base: UploadState = { fileName: file.name, status: "uploading", progress: 0 };
+    try {
+      const presigned = await apiFetch<PresignedUpload>(`/tickets/${ticketId}/attachments/presign`, {
+        method: "POST",
+        body: JSON.stringify({ fileName: file.name, mimeType: file.type, sizeBytes: file.size }),
+      });
+      await uploadFileWithProgress(presigned.uploadUrl, file, onProgress);
+      await apiFetch(`/tickets/${ticketId}/attachments/${presigned.attachmentId}/complete`, { method: "POST" });
+      return { ...base, status: "done", progress: 100 };
+    } catch {
+      return { ...base, status: "error", progress: 0 };
+    }
+  }
+
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (submitting) return;
-
+    if (submitting) return; // double-submit protection (FE-2.8)
     setFormError(null);
 
-    // Same schema the API uses — instant feedback, single definition of "valid".
     const parsed = createTicketSchema.safeParse(values);
     if (!parsed.success) {
-      const fieldErrors = fieldErrorsFrom(parsed.error);
+      const fieldErrors = flattenZod(parsed.error);
       setErrors(fieldErrors);
       focusFirstError(fieldErrors);
       return;
     }
-
     setErrors({});
     setSubmitting(true);
 
     try {
-      const body = new FormData();
-      Object.entries(parsed.data).forEach(([key, value]) => body.append(key, String(value)));
-      files.forEach((file) => body.append("files", file));
+      // 1. Create the ticket first — uploads never block the ticket itself.
+      const ticket = await apiFetch<Ticket>("/tickets", {
+        method: "POST",
+        body: JSON.stringify(parsed.data),
+      });
 
-      const response = await fetch("/api/tickets", { method: "POST", body });
-      const payload = await response.json().catch(() => null);
+      // 2. Upload files one by one with per-file progress. Failures keep the
+      // ticket and surface per-file with a retry (FE-2.7).
+      const uploads: UploadState[] = files.map((file) => ({
+        fileName: file.name,
+        status: "uploading" as const,
+        progress: 0,
+      }));
+      setResult({ ticket, uploads });
 
-      if (!response.ok) {
-        setErrors(payload?.fieldErrors ?? {});
-        setFormError(payload?.error ?? "We couldn't submit your ticket. Please try again.");
-        if (payload?.fieldErrors) focusFirstError(payload.fieldErrors);
-        return;
-      }
+      await Promise.all(
+        files.map(async (file, index) => {
+          const state = await uploadOne(ticket.id, file, (progress) => {
+            setResult((current) => {
+              if (!current) return current;
+              const next = [...current.uploads];
+              next[index] = { ...next[index]!, progress };
+              return { ...current, uploads: next };
+            });
+          });
+          setResult((current) => {
+            if (!current) return current;
+            const next = [...current.uploads];
+            next[index] = state;
+            return { ...current, uploads: next };
+          });
+        }),
+      );
 
-      setResult({ ticket: payload.ticket, emailSent: Boolean(payload.emailSent) });
       window.scrollTo({ top: 0, behavior: "smooth" });
-    } catch {
-      setFormError("Network error — check your connection and try again.");
+    } catch (error) {
+      const fieldErrors = fieldErrorsFromApi(error);
+      if (Object.keys(fieldErrors).length > 0) {
+        setErrors(fieldErrors);
+        focusFirstError(fieldErrors);
+      } else {
+        setFormError(error instanceof Error ? error.message : "We couldn't submit your ticket. Please try again.");
+      }
     } finally {
       setSubmitting(false);
     }
   };
 
+  async function retryUpload(index: number) {
+    if (!result) return;
+    const file = files[index];
+    if (!file) return;
+    setResult((current) => {
+      if (!current) return current;
+      const next = [...current.uploads];
+      next[index] = { ...next[index]!, status: "uploading", progress: 0 };
+      return { ...current, uploads: next };
+    });
+    const state = await uploadOne(result.ticket.id, file, (progress) => {
+      setResult((current) => {
+        if (!current) return current;
+        const next = [...current.uploads];
+        next[index] = { ...next[index]!, progress };
+        return { ...current, uploads: next };
+      });
+    });
+    setResult((current) => {
+      if (!current) return current;
+      const next = [...current.uploads];
+      next[index] = state;
+      return { ...current, uploads: next };
+    });
+  }
+
   if (result) {
-    return (
-      <TicketConfirmation
-        ticket={result.ticket}
-        emailSent={result.emailSent}
-        onReset={reset}
-      />
-    );
+    return <TicketConfirmation ticket={result.ticket} uploads={result.uploads} onRetry={retryUpload} onReset={reset} />;
   }
 
   return (
@@ -128,48 +202,15 @@ export function TicketForm() {
           <h2 className="text-xl font-semibold tracking-tight text-pearl">
             Tell us what&apos;s happening
           </h2>
-          <p className="mt-1.5 text-sm text-mist">
-            The more detail you give, the faster System Support can resolve it.
-          </p>
+          {session.data && (
+            <p className="mt-1.5 text-sm text-mist" aria-live="polite">
+              Submitting as {session.data.name} · {session.data.email}
+            </p>
+          )}
         </div>
 
         <div className="flex flex-col gap-1 px-6 py-6 sm:px-8">
-          <div className="grid gap-x-5 sm:grid-cols-2">
-            <Field htmlFor="employeeName" label="Your name" error={errors.employeeName}>
-              <Input
-                id="employeeName"
-                name="employeeName"
-                autoComplete="name"
-                placeholder="Godstime Erubami"
-                value={values.employeeName}
-                invalid={Boolean(errors.employeeName)}
-                aria-describedby={errors.employeeName ? "employeeName-error" : undefined}
-                onChange={(event) => set("employeeName", event.target.value)}
-              />
-            </Field>
-
-            <Field htmlFor="employeeEmail" label="Work email" error={errors.employeeEmail}>
-              <Input
-                id="employeeEmail"
-                name="employeeEmail"
-                type="email"
-                inputMode="email"
-                autoComplete="email"
-                placeholder="you@pearl27.com"
-                value={values.employeeEmail}
-                invalid={Boolean(errors.employeeEmail)}
-                aria-describedby={errors.employeeEmail ? "employeeEmail-error" : undefined}
-                onChange={(event) => set("employeeEmail", event.target.value)}
-              />
-            </Field>
-          </div>
-
-          <Field
-            htmlFor="title"
-            label="Issue title"
-            error={errors.title}
-            hint={`${values.title.length}/${TITLE_MAX}`}
-          >
+          <Field htmlFor="title" label="Issue title" error={errors.title} hint={`${values.title.length}/${TITLE_MAX}`}>
             <Input
               id="title"
               name="title"
@@ -183,16 +224,17 @@ export function TicketForm() {
           </Field>
 
           <div className="grid gap-x-5 sm:grid-cols-2">
-            <Field htmlFor="category" label="What does this relate to?">
+            <Field htmlFor="categoryId" label="What does this relate to?" error={errors.categoryId}>
               <Select
-                id="category"
-                name="category"
-                value={values.category}
-                onChange={(event) => set("category", event.target.value)}
+                id="categoryId"
+                name="categoryId"
+                value={values.categoryId}
+                onChange={(event) => set("categoryId", event.target.value)}
               >
-                {TICKET_CATEGORIES.map((category) => (
-                  <option key={category} value={category}>
-                    {CATEGORY_LABELS[category]}
+                <option value="">Choose a category</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
                   </option>
                 ))}
               </Select>
@@ -203,9 +245,9 @@ export function TicketForm() {
                 id="priority"
                 name="priority"
                 value={values.priority}
-                onChange={(event) => set("priority", event.target.value)}
+                onChange={(event) => set("priority", event.target.value as FormValues["priority"])}
               >
-                {TICKET_PRIORITIES.map((priority) => (
+                {(Object.keys(PRIORITY_LABELS) as (keyof typeof PRIORITY_LABELS)[]).map((priority) => (
                   <option key={priority} value={priority}>
                     {PRIORITY_LABELS[priority]}
                     {priority === "urgent" ? " — I can't work" : ""}
@@ -232,13 +274,7 @@ export function TicketForm() {
             </div>
           </Field>
 
-          <Field
-            htmlFor="files"
-            label="Screenshots or files"
-            optional
-            error={errors.files}
-            className="mt-1"
-          >
+          <Field htmlFor="files" label="Screenshots or files" optional error={errors.files} className="mt-1">
             <UploadZone files={files} onChange={setFiles} disabled={submitting} />
           </Field>
         </div>

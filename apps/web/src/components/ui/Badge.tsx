@@ -1,6 +1,12 @@
-import { CheckCircle2, CircleDot, Clock, Lock } from "lucide-react";
+import { CheckCircle2, CircleDot, Clock, Hourglass } from "lucide-react";
 import type { ReactNode } from "react";
 
+import {
+  PRIORITY_LABELS as CONTRACT_PRIORITY_LABELS,
+  STATUS_LABELS as CONTRACT_STATUS_LABELS,
+  type TicketPriority as ContractPriority,
+  type TicketStatus as ContractStatus,
+} from "@pearl27/contracts";
 import {
   PRIORITY_LABELS,
   STATUS_LABELS,
@@ -9,7 +15,18 @@ import {
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-const STATUS_STYLES: Record<TicketStatus, { chip: string; dot: string; icon: ReactNode }> = {
+export type BadgeStatus = ContractStatus | TicketStatus;
+export type BadgePriority = ContractPriority | TicketPriority;
+
+const STATUS_LABELS_ALL: Record<string, string> = { ...STATUS_LABELS, ...CONTRACT_STATUS_LABELS };
+const PRIORITY_LABELS_ALL: Record<string, string> = { ...PRIORITY_LABELS, ...CONTRACT_PRIORITY_LABELS };
+
+const STATUS_STYLES: Record<string, { chip: string; dot: string; icon: ReactNode }> = {
+  pending: {
+    chip: "border-ink-500/60 bg-ink-700/50 text-mist",
+    dot: "bg-fog",
+    icon: <Hourglass className="size-3.5" aria-hidden />,
+  },
   open: {
     chip: "border-aqua-400/25 bg-aqua-400/10 text-aqua-400",
     dot: "bg-aqua-400",
@@ -28,7 +45,7 @@ const STATUS_STYLES: Record<TicketStatus, { chip: string; dot: string; icon: Rea
   closed: {
     chip: "border-ink-500/60 bg-ink-700/50 text-mist",
     dot: "bg-fog",
-    icon: <Lock className="size-3.5" aria-hidden />,
+    icon: <Hourglass className="size-3.5" aria-hidden />,
   },
 };
 
@@ -44,7 +61,8 @@ const SIZES = {
   md: "h-7 gap-2 px-3 text-xs",
 } as const;
 
-const STATUS_STYLES_NIGHT: Record<TicketStatus, string> = {
+const STATUS_STYLES_NIGHT: Record<string, string> = {
+  pending: "border-cream/15 bg-night-deep text-haze",
   open: "border-cream/20 bg-cream/10 text-cream",
   in_progress: "border-iris-400/40 bg-iris-500/15 text-iris-300",
   resolved: "border-jade-400/40 bg-jade-400/15 text-jade-400",
@@ -58,13 +76,13 @@ export function StatusBadge({
   className,
   surface = "paper",
 }: {
-  status: TicketStatus;
+  status: BadgeStatus;
   size?: keyof typeof SIZES;
   withIcon?: boolean;
   className?: string;
   surface?: "paper" | "night";
 }) {
-  const style = STATUS_STYLES[status];
+  const style = STATUS_STYLES[status] ?? STATUS_STYLES.open!;
 
   return (
     <span
@@ -80,7 +98,7 @@ export function StatusBadge({
       ) : (
         <span className={cn("size-1.5 rounded-full", style.dot)} aria-hidden />
       )}
-      {STATUS_LABELS[status]}
+      {STATUS_LABELS_ALL[status] ?? status}
     </span>
   );
 }
@@ -98,7 +116,7 @@ export function PriorityBadge({
   className,
   surface = "paper",
 }: {
-  priority: TicketPriority;
+  priority: BadgePriority;
   size?: keyof typeof SIZES;
   className?: string;
   surface?: "paper" | "night";
@@ -115,7 +133,7 @@ export function PriorityBadge({
       {priority === "urgent" && (
         <span className="size-1.5 animate-pulse rounded-full bg-rose-400" aria-hidden />
       )}
-      {PRIORITY_LABELS[priority]}
+      {PRIORITY_LABELS_ALL[priority] ?? priority}
     </span>
   );
 }
