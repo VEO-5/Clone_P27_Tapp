@@ -5,8 +5,8 @@ import {
   deactivateAgent,
   getMockProfile,
   makeTicket,
-  makeTicketList,
   mockAgents,
+  setMockSession,
 } from "./fixtures";
 import {
   addEmployeeTicket,
@@ -22,6 +22,16 @@ import {
   shouldFailFirstPut,
   unratedResolvedTickets,
 } from "./employee";
+import {
+  assignTicket,
+  claimTicket,
+  deskActivity,
+  deskAgents,
+  deskDashboard,
+  listDeskTickets,
+  queryDeskTickets,
+  releaseTicket,
+} from "./desk";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
@@ -39,6 +49,16 @@ export const handlers = [
     return HttpResponse.json(profile);
   }),
   http.post(`${API}/auth/logout`, () => new HttpResponse(null, { status: 204 })),
+  http.post(`${API}/mock-session`, async ({ request }) => {
+    // Mock-only: lets the page tell the worker realm which role to serve.
+    const body = (await request.json().catch(() => ({}))) as { role?: string };
+    if (body.role === "employee" || body.role === "agent" || body.role === "admin") {
+      setMockSession(body.role);
+    } else if (body.role === null || body.role === undefined) {
+      setMockSession(null);
+    }
+    return HttpResponse.json({ ok: true });
+  }),
   http.get(`${API}/categories`, () => HttpResponse.json(mockCategories)),
   http.get(`${API}/known-issues`, () => HttpResponse.json(mockKnownIssues)),
   http.post(`${API}/tickets`, async ({ request }) => {
@@ -149,29 +169,77 @@ export const handlers = [
     }
     return HttpResponse.json({ ok: true }, { status: 201 });
   }),
-  http.get(`${API}/desk/dashboard`, () =>
-    HttpResponse.json({
-      cards: { unassigned: 4, pending: 3, mine: 5, breachingSoon: 1 },
-      series: { receivedVsResolved: [], byStatus: [], byCategory: [], ageBuckets: [] },
-    }),
-  ),
-  http.get(`${API}/desk/tickets`, () =>
-    HttpResponse.json({ items: makeTicketList(10), nextCursor: null }),
-  ),
-  http.get(`${API}/desk/tickets/:id`, ({ params }) =>
-    HttpResponse.json({
-      ...makeTicket({ id: String(params.id) }),
-      events: [],
-      messages: [],
-      attachments: [],
-    }),
-  ),
-  http.post(`${API}/desk/tickets/:id/claim`, ({ params }) =>
-    HttpResponse.json(makeTicket({ id: String(params.id), status: "open" })),
-  ),
-  http.post(`${API}/desk/tickets/:id/release`, ({ params }) =>
-    HttpResponse.json(makeTicket({ id: String(params.id), status: "pending" })),
-  ),
+  http.get(`${API}/desk/dashboard`, ({ request }) => {
+    const url = new URL(request.url);
+    const range = url.searchParams.get("range") === "7" ? 7 : 30;
+    return HttpResponse.json(deskDashboard(range));
+  }),
+  http.get(`${API}/desk/tickets`, ({ request }) => {
+    const url = new URL(request.url);
+    const sp = url.searchParams;
+    return HttpResponse.json(
+      queryDeskTickets({
+        tab: sp.get("tab") ?? "mine",
+        assigneeId: sp.get("assigneeId") ?? undefined,
+        status: sp.get("status") ?? undefined,
+        priority: sp.get("priority") ?? undefined,
+        categoryId: sp.get("categoryId") ?? undefined,
+        q: sp.get("q") ?? undefined,
+        sort: sp.get("sort") ?? undefined,
+        cursor: sp.get("cursor") ?? undefined,
+        limit: Number(sp.get("limit") ?? 10),
+      }),
+    );
+  }),
+  http.get(`${API}/desk/tickets/:id`, ({ params }) => {
+    const ticket = listDeskTickets().find((t) => t.id === String(params.id));
+    if (!ticket) {
+      return HttpResponse.json(
+        { error: { code: "NOT_FOUND", message: "Ticket not found." } },
+        { status: 404 },
+      );
+    }
+    return HttpResponse.json({ ...ticket, events: [], messages: [], attachments: [] });
+  }),
+  http.post(`${API}/desk/tickets/:id/claim`, ({ params }) => {
+    try {
+      const result = claimTicket(String(params.id));
+      if (!result.ok) {
+        return HttpResponse.json(
+          { error: { code: "ALREADY_ASSIGNED", message: `Already taken by ${result.assignee.name}`, assignee: result.assignee } },
+          { status: 409 },
+        );
+      }
+      return HttpResponse.json(result.ticket);
+    } catch {
+      return HttpResponse.json(
+        { error: { code: "NOT_FOUND", message: "Ticket not found." } },
+        { status: 404 },
+      );
+    }
+  }),
+  http.post(`${API}/desk/tickets/:id/release`, async ({ params, request }) => {
+    const body = (await request.json().catch(() => ({}))) as { reason?: string };
+    const ticket = releaseTicket(String(params.id), body.reason);
+    if (!ticket) {
+      return HttpResponse.json(
+        { error: { code: "NOT_FOUND", message: "Ticket not found." } },
+        { status: 404 },
+      );
+    }
+    return HttpResponse.json(ticket);
+  }),
+  http.post(`${API}/desk/tickets/:id/assign`, async ({ params, request }) => {
+    const body = (await request.json().catch(() => ({}))) as { assigneeId?: string };
+    const ticket = assignTicket(String(params.id), String(body.assigneeId ?? ""));
+    if (!ticket) {
+      return HttpResponse.json(
+        { error: { code: "NOT_FOUND", message: "Ticket or agent not found." } },
+        { status: 404 },
+      );
+    }
+    return HttpResponse.json(ticket);
+  }),
   http.post(`${API}/desk/tickets/:id/send`, ({ params }) =>
     HttpResponse.json({
       ...makeTicket({ id: String(params.id), status: "open" }),
@@ -180,8 +248,38 @@ export const handlers = [
       attachments: [],
     }),
   ),
-  http.get(`${API}/desk/agents`, () => HttpResponse.json(mockAgents)),
-  http.get(`${API}/desk/activity`, () => HttpResponse.json({ items: [], nextCursor: null })),
+  http.get(`${API}/desk/agents`, () => HttpResponse.json(deskAgents())),
+  http.get(`${API}/desk/activity`, () => HttpResponse.json({ items: deskActivity(), nextCursor: null })),
+  http.get(`${API}/desk/events`, () => {
+    // Synthetic SSE: one ticket.updated shortly after connect, then heartbeats.
+    const first = listDeskTickets().find((t) => !t.assignee) ?? listDeskTickets()[0]!;
+    const stream = new ReadableStream({
+      start(controller) {
+        const encode = (event: string, data: unknown) =>
+          controller.enqueue(new TextEncoder().encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+        const beat = setInterval(() => {
+          try {
+            encode("heartbeat", { at: new Date().toISOString() });
+          } catch {
+            clearInterval(beat);
+          }
+        }, 15000);
+        setTimeout(() => {
+          try {
+            encode("ticket.updated", {
+              id: first.id,
+              version: first.version + 1,
+              status: first.status,
+              assignee: first.assignee,
+            });
+          } catch {
+            // client went away — the interval cleanup handles the rest
+          }
+        }, 500);
+      },
+    });
+    return new HttpResponse(stream, { headers: { "Content-Type": "text/event-stream" } });
+  }),
   http.get(`${API}/admin/dashboard`, () => HttpResponse.json({ cards: {}, widgets: {} })),
   http.get(`${API}/admin/agents`, () => HttpResponse.json(mockAgents)),
   http.post(`${API}/admin/agents`, async ({ request }) => {

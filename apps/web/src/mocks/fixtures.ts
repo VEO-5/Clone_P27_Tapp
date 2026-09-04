@@ -117,7 +117,21 @@ export function deactivateAgent(id: string): MockAgent | null {
 
 export type MockRole = "employee" | "agent" | "admin" | null;
 
-let mockRole: MockRole = "employee";
+/** Mock sessions survive reloads: the dummy cookie re-seeds the role on import. */
+function initialMockRole(): MockRole {
+  try {
+    const cookie = typeof document !== "undefined" ? document.cookie : "";
+    const match = /(?:^|; )p27_session=mock-(employee|agent|admin)(?:;|$)/.exec(cookie);
+    if (match?.[1] === "agent") return "agent";
+    if (match?.[1] === "admin") return "admin";
+    if (match?.[1] === "employee") return "employee";
+  } catch {
+    // non-browser or no cookie — fall through to the default
+  }
+  return "employee";
+}
+
+let mockRole: MockRole = initialMockRole();
 
 const ROLE_PROFILE: Record<Exclude<MockRole, null>, { id: string; email: string; name: string; role: string }> = {
   employee: { id: "u-employee-1", email: "ada@pearl27.com", name: "Ada Obi", role: "employee" },

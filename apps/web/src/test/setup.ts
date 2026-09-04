@@ -1,6 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 import { afterAll, afterEach, beforeAll, vi } from "vitest";
 
+import { resetDeskStore } from "@/mocks/desk";
 import { resetEmployeeStore } from "@/mocks/employee";
 import { resetAgents, setMockSession } from "@/mocks/fixtures";
 import { server } from "@/mocks/server";
@@ -16,6 +17,7 @@ beforeAll(() => {
 afterEach(() => {
   server.resetHandlers();
   resetEmployeeStore();
+  resetDeskStore();
   resetAgents();
   setMockSession("employee");
 });afterAll(() => server.close());

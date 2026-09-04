@@ -179,6 +179,105 @@ export const agentEmailSchema = z.object({
     }),
 });
 
+// ---------------------------------------------------------------------------
+// Desk shapes (Phase 3) — queue rows, dashboard, activity, live events
+// ---------------------------------------------------------------------------
+
+export const Assignee = z.object({
+  id: z.string(),
+  name: z.string(),
+  avatarUrl: z.string().url().nullable().optional(),
+});
+export type Assignee = z.infer<typeof Assignee>;
+
+export const LockInfo = z.object({
+  lockedByMe: z.boolean(),
+  lockedByOther: z.boolean(),
+  ownerName: z.string().nullable().optional(),
+});
+export type LockInfo = z.infer<typeof LockInfo>;
+
+export const PreviousRelease = z.object({
+  status: TicketStatus,
+  agentName: z.string(),
+  releasedAt: z.string(),
+  reason: z.string().nullable().optional(),
+});
+export type PreviousRelease = z.infer<typeof PreviousRelease>;
+
+export const SlaInfo = z.object({
+  dueAt: z.string().nullable().optional(),
+  breached: z.boolean(),
+  breachingSoon: z.boolean(),
+});
+export type SlaInfo = z.infer<typeof SlaInfo>;
+
+export const DeskTicket = Ticket.extend({
+  requesterName: z.string().optional(),
+  assignee: Assignee.nullable().optional(),
+  lock: LockInfo.optional(),
+  previousRelease: PreviousRelease.nullable().optional(),
+  unreadCount: z.number().int().nonnegative().optional(),
+  sla: SlaInfo.optional(),
+});
+export type DeskTicket = z.infer<typeof DeskTicket>;
+
+export const DeskTab = z.enum(["unassigned", "mine", "all", "by-agent"]);
+export type DeskTab = z.infer<typeof DeskTab>;
+
+export const DeskDashboardCards = z.object({
+  unassigned: z.number(),
+  pending: z.number(),
+  mine: z.number(),
+  breachingSoon: z.number(),
+  receivedToday: z.number(),
+  receivedWeek: z.number(),
+  resolvedByMeToday: z.number(),
+  resolvedByMeWeek: z.number(),
+  myAvgResolutionHours: z.number().nullable().optional(),
+});
+export type DeskDashboardCards = z.infer<typeof DeskDashboardCards>;
+
+export const DashboardSeries = z.object({
+  receivedVsResolved: z.array(z.object({ date: z.string(), received: z.number(), resolved: z.number() })),
+  byStatus: z.array(z.object({ status: TicketStatus, count: z.number() })),
+  byCategory: z.array(z.object({ categoryId: z.string(), categoryName: z.string(), count: z.number() })),
+  ageBuckets: z.array(z.object({ bucket: z.string(), count: z.number() })),
+});
+export type DashboardSeries = z.infer<typeof DashboardSeries>;
+
+export const DeskDashboard = z.object({
+  cards: DeskDashboardCards,
+  series: DashboardSeries,
+});
+export type DeskDashboard = z.infer<typeof DeskDashboard>;
+
+export const ActivityItem = z.object({
+  id: z.string(),
+  kind: z.enum(["assigned", "released", "message", "status_changed"]),
+  ticketId: z.string(),
+  ticketReference: z.string(),
+  text: z.string(),
+  actorName: z.string(),
+  createdAt: z.string(),
+});
+export type ActivityItem = z.infer<typeof ActivityItem>;
+
+// SSE event payloads (§3.4)
+export const SseTicketUpdated = z.object({
+  id: z.string(),
+  version: z.number(),
+  status: TicketStatus,
+  assignee: Assignee.nullable(),
+});
+export type SseTicketUpdated = z.infer<typeof SseTicketUpdated>;
+
+export const SseMessageCreated = z.object({ ticketId: z.string() });
+export type SseMessageCreated = z.infer<typeof SseMessageCreated>;
+
+export const SsePresence = z.object({ ticketId: z.string(), viewers: z.array(z.string()) });
+export type SsePresence = z.infer<typeof SsePresence>;
+
 export function validateFile(file: { name: string; size: number; type: string }): string | null {
   if (!(ALLOWED_MIME_TYPES as readonly string[]).includes(file.type)) {
     return `${file.name}: only PNG, JPEG, WebP, GIF, PDF, or TXT files are allowed`;

@@ -10,6 +10,9 @@ test("FE-1.1: signed-out /desk redirects to /sign-in?next=/desk, then mock sign-
   await expect(page).toHaveURL(/\/sign-in\?next=%2Fdesk/);
   await page.getByRole("button", { name: /continue as kofi mensah/i }).click();
   await expect(page).toHaveURL(/\/desk/);
+  // Content — not just URL — proves the worker serves the agent role.
+  // (Scoped to heading: production builds mirror titles into a route announcer.)
+  await expect(page.getByRole("heading", { name: /welcome, kofi/i })).toBeVisible();
 });
 
 test("FE-1.2: employee visiting /desk sees the 403 screen", async ({ page }) => {
@@ -20,10 +23,14 @@ test("FE-1.2: employee visiting /desk sees the 403 screen", async ({ page }) => 
   await expect(page.getByText(/you can't open this screen/i)).toBeVisible();
 });
 
-test("FE-1.3: admin lands on /admin with Desk and Admin nav", async ({ page }) => {
+test("FE-1.3: admin lands on /admin and reaches agent management", async ({ page }) => {
   await page.goto("/sign-in");
   await page.getByRole("button", { name: /continue as admin/i }).click();
   await expect(page).toHaveURL(/\/admin/);
+  // Desk shell (header hides itself on /admin paths by design).
+  await expect(page.getByText("All Tickets", { exact: true })).toBeVisible();
+  await page.goto("/admin/agents");
+  await expect(page.getByRole("heading", { name: /agent management/i })).toBeVisible();
 });
 
 test("FE-1.4: /auth/denied explains the domain rule", async ({ page }) => {

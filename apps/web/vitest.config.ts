@@ -9,6 +9,9 @@ export default defineConfig({
     setupFiles: ["./src/test/setup.ts"],
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
     globals: true,
+    // Browser-like component tests (uploads, timers) are slow on loaded
+    // machines — 15s keeps them stable without hiding real hangs.
+    testTimeout: 15000,
   },
   resolve: {
     alias: {

@@ -12,13 +12,16 @@ export class ApiError extends Error {
   code: string;
   status: number;
   fieldErrors?: Record<string, string>;
+  /** Extra error payload (e.g. `assignee` on 409 ALREADY_ASSIGNED). */
+  details?: Record<string, unknown>;
 
-  constructor(status: number, code: string, message: string, fieldErrors?: Record<string, string>) {
+  constructor(status: number, code: string, message: string, fieldErrors?: Record<string, string>, details?: Record<string, unknown>) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.code = code;
     this.fieldErrors = fieldErrors;
+    this.details = details;
   }
 
   get isUnauthenticated(): boolean {
@@ -38,11 +41,13 @@ async function parseError(res: Response): Promise<ApiError> {
   if (payload && typeof payload === "object" && "error" in payload) {
     const err = (payload as ApiErrorShape).error;
     if (typeof err === "object" && err !== null) {
+      const { code, message, fieldErrors, ...details } = err as ApiErrorShape["error"] & Record<string, unknown>;
       return new ApiError(
         res.status,
-        err.code ?? `HTTP_${res.status}`,
-        err.message ?? "Something went wrong.",
-        err.fieldErrors,
+        code ?? `HTTP_${res.status}`,
+        message ?? "Something went wrong.",
+        fieldErrors,
+        Object.keys(details).length > 0 ? details : undefined,
       );
     }
     if (typeof err === "string") {

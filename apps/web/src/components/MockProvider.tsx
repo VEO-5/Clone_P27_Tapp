@@ -13,6 +13,9 @@ export function MockProvider({ children }: { children: React.ReactNode }) {
     (async () => {
       const { worker } = await import("@/mocks/browser");
       if (!cancelled) {
+        // start() registers and claims clients before resolving, so once
+        // ready flips, every fetch from this page goes through the mocks.
+        // Children don't render until then — no reload races with sign-in.
         await worker.start({ onUnhandledRequest: "bypass" });
         setReady(true);
       }
