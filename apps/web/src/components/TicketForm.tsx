@@ -1,6 +1,6 @@
 "use client";
 
-import { createTicketSchema, type Ticket } from "@pearl27/contracts";
+import { createTicketSchema, PRIORITY_LABELS, type Ticket } from "@pearl27/contracts";
 import { AlertTriangle, Send } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
@@ -12,7 +12,6 @@ import { CharCount, Field, Input, Select, Textarea } from "@/components/ui/Form"
 import { Panel } from "@/components/ui/Panel";
 import { useSession } from "@/features/auth/useSession";
 import { apiFetch } from "@/lib/api";
-import { PRIORITY_LABELS } from "@/lib/types";
 
 import { fieldErrorsFromApi, uploadFileWithProgress, type PresignedUpload } from "@/features/tickets/uploads";
 

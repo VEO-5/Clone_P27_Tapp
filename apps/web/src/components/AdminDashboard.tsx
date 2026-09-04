@@ -43,7 +43,6 @@ import {
   DeskTableHeader,
   DeskTableRow,
 } from "@/components/desk/table";
-import { NewTicketDialog } from "@/components/NewTicketDialog";
 import { EmptyState } from "@/components/ui/Panel";
 import {
   PRIORITY_LABELS,
@@ -177,15 +176,6 @@ export function AdminDashboard({
     setLiveTickets(tickets);
   }
   const liveStats = useMemo(() => computeStats(liveTickets), [liveTickets]);
-
-  const handleCreated = (ticket: Ticket) => {
-    setLiveTickets((current) =>
-      current.some((t) => t.id === ticket.id) ? current : [ticket, ...current],
-    );
-    // Jump back to the unfiltered queue so the new ticket is visible.
-    setQuery("");
-    startTransition(() => router.replace("/admin"));
-  };
 
   const replaceFilters = (next: {
     q?: string;
@@ -417,8 +407,7 @@ export function AdminDashboard({
               <DeskButton variant="secondary" size="md" onClick={() => exportCsv(filtered)}>
                 <Download aria-hidden /> Export
               </DeskButton>
-          <NewTicketDialog onCreated={handleCreated} />
-          <DeskButton
+              <DeskButton
                 variant="secondary"
                 size="md"
                 className="lg:hidden"

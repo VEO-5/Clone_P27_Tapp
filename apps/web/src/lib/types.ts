@@ -1,4 +1,10 @@
-/** Shared domain types for the Sphere Support Desk. */
+/**
+ * LEGACY domain types — do not import in new code. Use `@pearl27/contracts`.
+ * Remaining consumers (removed in their rebuild phases):
+ * - AdminDashboard, DeskSidebar, AdminQueueActions, AdminTicketActions (Phase 5)
+ * - Timeline + StatusTimeline adapter, Badge compat (Phase 4)
+ * - lib/validation, lib/workflow, lib/reference (pure helpers + their tests)
+ */
 
 export const TICKET_STATUSES = ["open", "in_progress", "resolved", "closed"] as const;
 export type TicketStatus = (typeof TICKET_STATUSES)[number];
