@@ -116,7 +116,7 @@ export function TicketConfirmation({
 
         <div className="mt-2 flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
           <Button asChild>
-            <Link href="/tickets">
+            <Link href={`/tickets/${ticket.reference}`}>
               View ticket
               <ArrowRight className="size-4" aria-hidden />
             </Link>

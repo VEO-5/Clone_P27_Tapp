@@ -72,6 +72,10 @@ describe("TicketForm", () => {
       "The VPN drops every twenty minutes since the client update yesterday.",
     );
     await user.selectOptions(screen.getByLabelText(/what does this relate to/i), "network");
+    // Attachments are required — a submit without one never reaches the API.
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [png("proof.png")] } });
+    expect(await screen.findByText("proof.png")).toBeInTheDocument();
     const button = screen.getByRole("button", { name: /submit ticket/i });
     await user.click(button);
     await user.click(button);
@@ -80,6 +84,25 @@ describe("TicketForm", () => {
       ([url, init]) => String(url).endsWith("/tickets") && (init as RequestInit)?.method === "POST",
     );
     expect(posts).toHaveLength(1);
+    spy.mockRestore();
+  });
+
+  it("FE-2.9: submit without a screenshot shows the attachment error and sends no POST", async () => {
+    const spy = vi.spyOn(globalThis, "fetch");
+    const user = userEvent.setup();
+    renderWithProviders(<TicketForm />);
+    await user.type(screen.getByLabelText(/issue title/i), "VPN keeps dropping every day");
+    await user.type(
+      screen.getByLabelText(/describe the issue/i),
+      "The VPN drops every twenty minutes since the client update yesterday.",
+    );
+    await user.selectOptions(screen.getByLabelText(/what does this relate to/i), "network");
+    await user.click(screen.getByRole("button", { name: /submit ticket/i }));
+    expect(await screen.findByText(/attach at least one screenshot or file/i)).toBeInTheDocument();
+    const posts = spy.mock.calls.filter(
+      ([url, init]) => String(url).endsWith("/tickets") && (init as RequestInit)?.method === "POST",
+    );
+    expect(posts).toHaveLength(0);
     spy.mockRestore();
   });
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Ticket } from "@pearl27/contracts";
 import { Loader2, Star } from "lucide-react";
 
@@ -15,6 +15,13 @@ export function CsatPrompt({ ticket, onRated }: { ticket: Ticket; onRated: () =>
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [done, setDone] = useState(false);
+  const ratedTimer = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (ratedTimer.current !== null) window.clearTimeout(ratedTimer.current);
+    };
+  }, []);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -30,7 +37,10 @@ export function CsatPrompt({ ticket, onRated }: { ticket: Ticket; onRated: () =>
         body: JSON.stringify({ score, comment: comment.trim() || undefined }),
       });
       setDone(true);
-      onRated();
+      // Let the thanks state paint before the parent dismisses this prompt
+      // (dashboard unmounts on onRated; detail refetches unrated). Without the
+      // delay the form just vanishes with no confirmation.
+      ratedTimer.current = window.setTimeout(() => onRated(), 2500);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Couldn't send your rating. Try again.");
     } finally {
@@ -52,7 +62,7 @@ export function CsatPrompt({ ticket, onRated }: { ticket: Ticket; onRated: () =>
       className="rounded-[4px] border border-ink-700 bg-white p-4"
       aria-label={`Rate ${ticket.reference}`}
     >
-      <p className="text-[13.5px] font-semibold text-pearl">
+      <p className="text-[13.5px] font-semibold text-pearl break-words">
         How was the support on “{ticket.title}”?
       </p>
       <div className="mt-2 flex items-center gap-1" role="radiogroup" aria-label="Rating out of 5">

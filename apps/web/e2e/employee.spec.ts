@@ -115,6 +115,29 @@ test("FE-2.16: submit CSAT rating", async ({ page }) => {
   await expect(page.getByText(/thanks for rating/i)).toBeVisible();
 });
 
+// FE-2.19: lengthy unbroken words wrap inside the card — no sideways scroll.
+test("FE-2.19: unbroken long text wraps, page never scrolls sideways", async ({ page }) => {
+  await signInAsEmployee(page);
+  await page.goto("/tickets/new");
+  await page.getByLabel(/issue title/i).fill("y".repeat(140));
+  await page
+    .getByLabel(/describe the issue/i)
+    .fill(
+      "iiiiiiiiiiiiiiiiii ffffffffffffffffffffffffffffffffffffff oooooooooooooooooooooo " +
+        "s".repeat(300),
+    );
+  await page.getByLabel(/what does this relate to/i).selectOption("email");
+  await page.locator('input[type="file"]').setInputFiles([PNG]);
+  await page.getByRole("button", { name: /submit ticket/i }).click();
+  await expect(page.getByText(/your ticket is with system support/i)).toBeVisible();
+  await page.getByRole("link", { name: /view ticket/i }).click();
+  await expect(page.getByText(/y{20}/).first()).toBeVisible();
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(overflow).toBeLessThanOrEqual(1);
+});
+
 // FE-2.17: 375px viewport — no horizontal scroll on the three screens.
 test("FE-2.17: mobile 375px has no horizontal scroll", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });

@@ -23,8 +23,8 @@ export function KnownIssueBanner({ issue }: { issue: { id: string; title: string
     <div className="rounded-[4px] border border-l-2 border-gold-400/30 border-l-gold-400 bg-gold-400/10 p-4" role="status">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-[13.5px] font-semibold text-pearl">{issue.title}</p>
-          <p className="mt-1 text-[13px] leading-relaxed text-mist">{issue.message}</p>
+          <p className="text-[13.5px] font-semibold text-pearl break-words">{issue.title}</p>
+          <p className="mt-1 text-[13px] leading-relaxed text-mist break-words">{issue.message}</p>
         </div>
         <button
           type="button"

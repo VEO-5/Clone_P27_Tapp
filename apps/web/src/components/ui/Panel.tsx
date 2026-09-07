@@ -58,7 +58,7 @@ export function PanelHeader({
     >
       <div className="min-w-0">
         {eyebrow && <p className="eyebrow mb-2">{eyebrow}</p>}
-        <h2 className="text-lg font-semibold tracking-tight text-pearl">{title}</h2>
+        <h2 className="text-lg font-semibold tracking-tight text-pearl break-words">{title}</h2>
         {description && (
           <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-mist">{description}</p>
         )}

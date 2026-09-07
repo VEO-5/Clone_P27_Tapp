@@ -125,7 +125,7 @@ export function TicketDetail({ reference }: { reference: string }) {
         <div className="flex flex-col gap-8 p-6 sm:p-8">
           <section>
             <p className="eyebrow mb-3">Description</p>
-            <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-pearl-dim">
+            <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-pearl-dim break-words">
               {ticket.description}
             </p>
             <div className="mt-4">

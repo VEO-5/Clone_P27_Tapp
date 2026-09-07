@@ -73,7 +73,18 @@ export function TicketForm() {
   const focusFirstError = (fieldErrors: Record<string, string>) => {
     const first = Object.keys(fieldErrors)[0];
     if (!first) return;
+    // File input is sr-only but focusable — focusing it announces the error.
     formRef.current?.querySelector<HTMLElement>(`[name="${first}"]`)?.focus();
+  };
+
+  const handleFilesChange = (next: File[]) => {
+    setFiles(next);
+    setErrors((current) => {
+      if (!current.files) return current;
+      const nextErrors = { ...current };
+      delete nextErrors.files;
+      return nextErrors;
+    });
   };
 
   const reset = () => {
@@ -105,12 +116,21 @@ export function TicketForm() {
     setFormError(null);
 
     const parsed = createTicketSchema.safeParse(values);
-    if (!parsed.success) {
-      const fieldErrors = flattenZod(parsed.error);
+    const fieldErrors: Record<string, string> = parsed.success ? {} : flattenZod(parsed.error);
+    // Screenshots/files are required — support triages from the visual, and
+    // the confirmation screen assumes at least one attachment slot. Listed
+    // after the text fields so focus still lands on the title first.
+    if (files.length === 0) {
+      fieldErrors.files ??= "Attach at least one screenshot or file so support can see the issue.";
+    }
+    if (Object.keys(fieldErrors).length > 0) {
       setErrors(fieldErrors);
       focusFirstError(fieldErrors);
       return;
     }
+    // Unreachable: a failed parse always yields field errors. Keeps narrowing
+    // so parsed.data is safe below.
+    if (!parsed.success) return;
     setErrors({});
     setSubmitting(true);
 
@@ -273,8 +293,8 @@ export function TicketForm() {
             </div>
           </Field>
 
-          <Field htmlFor="files" label="Screenshots or files" optional error={errors.files} className="mt-1">
-            <UploadZone files={files} onChange={setFiles} disabled={submitting} />
+          <Field htmlFor="files" label="Screenshots or files" error={errors.files} className="mt-1">
+            <UploadZone files={files} onChange={handleFilesChange} disabled={submitting} />
           </Field>
         </div>
 

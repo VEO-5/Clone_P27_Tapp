@@ -86,6 +86,14 @@ export function UploadZone({ files, onChange, disabled }: UploadZoneProps) {
 
   const full = files.length >= MAX_FILES;
 
+  const openPicker = (event: React.SyntheticEvent) => {
+    // Clicks that land directly on the native input already open the dialog —
+    // re-firing input.click() from the zone handler stacks a second dialog
+    // behind the first. Only the zone itself should trigger the picker.
+    if (event.target === inputRef.current) return;
+    if (!disabled && !full) inputRef.current?.click();
+  };
+
   return (
     <div className="flex flex-col gap-3">
       <div
@@ -93,11 +101,11 @@ export function UploadZone({ files, onChange, disabled }: UploadZoneProps) {
         tabIndex={disabled || full ? -1 : 0}
         aria-disabled={disabled || full}
         aria-label="Attach screenshots or files"
-        onClick={() => !disabled && !full && inputRef.current?.click()}
+        onClick={openPicker}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
-            if (!disabled && !full) inputRef.current?.click();
+            openPicker(event);
           }
         }}
         onDragOver={(event) => {
@@ -145,6 +153,7 @@ export function UploadZone({ files, onChange, disabled }: UploadZoneProps) {
         <input
           ref={inputRef}
           type="file"
+          id="files"
           name="files"
           multiple
           accept={ACCEPT_ATTRIBUTE}
