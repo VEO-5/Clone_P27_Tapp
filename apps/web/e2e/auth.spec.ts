@@ -10,9 +10,10 @@ test("FE-1.1: signed-out /desk redirects to /sign-in?next=/desk, then mock sign-
   await expect(page).toHaveURL(/\/sign-in\?next=%2Fdesk/);
   await page.getByRole("button", { name: /continue as kofi mensah/i }).click();
   await expect(page).toHaveURL(/\/desk/);
-  // Content — not just URL — proves the worker serves the agent role.
-  // (Scoped to heading: production builds mirror titles into a route announcer.)
-  await expect(page.getByRole("heading", { name: /welcome, kofi/i })).toBeVisible();
+  // Content — not just URL — proves the worker serves the agent role: the
+  // board heading plus the agent sidebar only render for that role.
+  await expect(page.getByRole("heading", { name: "Tickets", exact: true })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: /desk navigation/i })).toBeVisible();
 });
 
 test("FE-1.2: employee visiting /desk sees the 403 screen", async ({ page }) => {
@@ -49,7 +50,7 @@ test("FE-1.3b: agent visiting /desk/admin/agents sees the 403 screen", async ({ 
 
 test("FE-1.4: /auth/denied explains the domain rule", async ({ page }) => {
   await page.goto("/auth/denied?reason=domain");
-  await expect(page.getByText(/pearl27.*accounts only/i)).toBeVisible();
+  await expect(page.getByText(/pearl 27 google accounts only/i)).toBeVisible();
   await expect(page.getByRole("link", { name: /try another account/i })).toBeVisible();
 });
 
@@ -77,6 +78,7 @@ test("FE-1.9: email sign-in — company address lands as employee, foreign rejec
   await expect(page).toHaveURL(/\/sign-in/);
   await page.getByLabel(/work email/i).fill("someone@gmail.com");
   await page.getByRole("button", { name: /continue with email/i }).click();
-  await expect(page.getByRole("alert")).toContainText(/pearl27\.com/i);
+  // Scoped to the form error: Next's route announcer also carries role=alert.
+  await expect(page.locator("#mock-email-error")).toContainText(/pearl27\.com/i);
   await expect(page).toHaveURL(/\/sign-in/);
 });

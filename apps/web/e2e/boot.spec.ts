@@ -4,7 +4,11 @@ import { expect, test } from "@playwright/test";
 test("boots against mocks without console errors", async ({ page }) => {
   const errors: string[] = [];
   page.on("console", (msg) => {
-    if (msg.type() === "error") errors.push(msg.text());
+    // Browser network noise ("Failed to load resource" for the expected
+    // signed-out /auth/me 401) is not an app error — only real JS errors fail.
+    if (msg.type() === "error" && !msg.text().startsWith("Failed to load resource")) {
+      errors.push(msg.text());
+    }
   });
   await page.goto("/sign-in");
   await expect(page.getByRole("heading", { name: /sphere support/i })).toBeVisible();
