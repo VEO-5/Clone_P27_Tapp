@@ -127,8 +127,12 @@ function Board() {
   const agents = agentsQuery.data ?? [];
 
   return (
-    <div className="pb-2 lg:flex lg:h-[calc(100dvh_-_12px)] lg:flex-col lg:overflow-hidden lg:pb-4">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    // Viewport-locked on lg+: the DeskShell content column already accounts
+    // pt-3 (0.75rem) + pb-6 (1.5rem) = 2.25rem of shell padding, so this
+    // height leaves zero overflow — the table frame below is the ONLY
+    // scroller and the window never moves.
+    <div className="pb-2 lg:flex lg:h-[calc(100dvh-2.25rem)] lg:flex-col lg:overflow-hidden lg:pb-0">
+      <div className="mb-4 flex shrink-0 flex-wrap items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-3">
             <h1 className="font-display text-[32px] font-bold tracking-tight text-black">Tickets</h1>
@@ -145,7 +149,8 @@ function Board() {
         )}
       </div>
 
-      {dashboard.isPending ? (
+      <div className="shrink-0">
+        {dashboard.isPending ? (
         <div className="grid grid-cols-2 gap-3 xl:grid-cols-4" aria-label="Loading stats">
           {[0, 1, 2, 3].map((i) => (
             <Skeleton key={i} className="h-32 rounded-2xl" />
@@ -163,8 +168,9 @@ function Board() {
       ) : (
         dashboard.data && <DeskStatCards cards={dashboard.data.cards} series={dashboard.data.series} />
       )}
+      </div>
 
-      <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+      <div className="mt-4 flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
         <div className="relative flex-1 sm:max-w-sm">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-fog" aria-hidden />
           <label htmlFor="board-search" className="sr-only">Search tickets by subject, customer, or ID</label>
@@ -222,7 +228,10 @@ function Board() {
         </div>
       </div>
 
-      <div className="mt-4 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-hidden" aria-live="polite">
+      {/* No aria-live here: SSE re-renders this table constantly and live
+          regions can yank scroll in some browsers. Connection state is
+          announced once via the LiveDot status above. */}
+      <div className="mt-4 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-hidden">
         {board.isError ? (
           <Panel className="p-6">
             <p role="alert" className="text-sm text-rose-400">
@@ -240,6 +249,9 @@ function Board() {
           </Panel>
         ) : (
           <>
+            <p className="mb-2 text-[12.5px] text-fog" role="status">
+              Showing {visible.length} of {all.length} incoming requests — every status, assigned or not.
+            </p>
             {/* Desktop: data table. Mobile: cards. */}
             <div className="hidden lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
               <TicketTable tickets={visible} role={role} agents={agents} />

@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 
 import { queryKeys } from "@/lib/query";
 
@@ -12,14 +13,23 @@ import { EmailSignInForm } from "./EmailSignInForm";
 export function MockSignInButtons({ next }: { next?: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const [signingRole, setSigningRole] = useState<(typeof MOCK_ROLES)[number]["role"] | null>(null);
 
   async function signInAs(role: (typeof MOCK_ROLES)[number]["role"]) {
-    const { landing, profile } = await mockSignIn(role);
-    // Bust the Infinity-cached session so gates read the new role, not the
-    // profile fetched on the sign-in page load.
-    if (profile) queryClient.setQueryData(queryKeys.me, profile);
-    else await queryClient.invalidateQueries({ queryKey: queryKeys.me });
-    router.push(landingTarget(next, landing));
+    if (signingRole) return;
+    setSigningRole(role);
+    try {
+      const { landing, profile } = await mockSignIn(role);
+      // Bust the Infinity-cached session so gates read the new role, not the
+      // profile fetched on the sign-in page load. The auth-route header stays
+      // minimal (see SessionHeader), so this early flip never flashes authed
+      // chrome over the sign-in card before the push below lands.
+      if (profile) queryClient.setQueryData(queryKeys.me, profile);
+      else await queryClient.invalidateQueries({ queryKey: queryKeys.me });
+      router.push(landingTarget(next, landing));
+    } finally {
+      setSigningRole(null);
+    }
   }
   return (
     <div className="flex flex-col gap-5">
@@ -34,10 +44,14 @@ export function MockSignInButtons({ next }: { next?: string }) {
         <button
           key={role}
           type="button"
+          disabled={signingRole !== null}
+          aria-busy={signingRole === role || undefined}
           onClick={() => void signInAs(role)}
-          className="flex min-h-11 flex-col items-start justify-center gap-0.5 rounded-lg border border-ink-600 bg-white px-4 py-2.5 text-left transition-colors hover:border-iris-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iris-500/40"
+          className="flex min-h-11 flex-col items-start justify-center gap-0.5 rounded-lg border border-ink-600 bg-white px-4 py-2.5 text-left transition-colors hover:border-iris-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iris-500/40 disabled:cursor-wait disabled:opacity-70"
         >
-          <span className="text-sm font-medium text-pearl">Continue as {label}</span>
+          <span className="text-sm font-medium text-pearl">
+            {signingRole === role ? "Signing you in…" : `Continue as ${label}`}
+          </span>
           <span className="text-[12.5px] text-fog">{description}</span>
         </button>
       ))}
