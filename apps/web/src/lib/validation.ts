@@ -73,10 +73,6 @@ export const updateTicketSchema = z
 
 export type UpdateTicketInput = z.infer<typeof updateTicketSchema>;
 
-export const loginSchema = z.object({
-  accessCode: z.string().trim().min(1, "Enter the support access code"),
-});
-
 export const employeeLoginSchema = z.object({
   email: z
     .string()

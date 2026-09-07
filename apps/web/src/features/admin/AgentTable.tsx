@@ -2,9 +2,24 @@
 
 import { useState } from "react";
 
-import { Button } from "@/components/ui/Button";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
-import { Table, TableCell, TableHead, TableHeaderCell, TableRow } from "@/components/ui/Table";
+import { UserAvatar } from "@/components/UserAvatar";
+import { Badge } from "@/components/shadcn/badge";
+import { Button } from "@/components/shadcn/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogTitle,
+} from "@/components/shadcn/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/shadcn/table";
 import { apiFetch } from "@/lib/api";
 import { formatRelative } from "@/lib/utils";
 import type { MockAgent } from "@/mocks/fixtures";
@@ -15,6 +30,12 @@ const STATUS_LABEL: Record<MockAgent["status"], string> = {
   active: "Active",
   invited: "Invited",
   deactivated: "Deactivated",
+};
+
+const STATUS_BADGE: Record<MockAgent["status"], "default" | "secondary" | "outline"> = {
+  active: "default",
+  invited: "secondary",
+  deactivated: "outline",
 };
 
 export function AgentTable({ initialAgents }: { initialAgents: MockAgent[] }) {
@@ -32,7 +53,7 @@ export function AgentTable({ initialAgents }: { initialAgents: MockAgent[] }) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-mist" aria-live="polite">
+        <p className="text-sm text-muted-foreground" aria-live="polite">
           {notice ?? `${agents.length} agents`}
         </p>
         <CreateAgentDialog onCreated={(agent) => {
@@ -41,42 +62,51 @@ export function AgentTable({ initialAgents }: { initialAgents: MockAgent[] }) {
         }} />
       </div>
 
-      <Table>
-        <TableHead>
-          <TableRow>
-            <TableHeaderCell>Name</TableHeaderCell>
-            <TableHeaderCell>Status</TableHeaderCell>
-            <TableHeaderCell>Open tickets</TableHeaderCell>
-            <TableHeaderCell>Last seen</TableHeaderCell>
-            <TableHeaderCell>
-              <span className="sr-only">Actions</span>
-            </TableHeaderCell>
-          </TableRow>
-        </TableHead>
-        <tbody>
-          {agents.map((agent) => (
-            <TableRow key={agent.id}>
-              <TableCell>
-                <span className="block font-medium">{agent.name}</span>
-                <span className="block text-[12.5px] text-fog">{agent.email}</span>
-                {agent.status === "invited" && (
-                  <span className="block text-[12.5px] text-fog">Invited — activates on first sign-in</span>
-                )}
-              </TableCell>
-              <TableCell>{STATUS_LABEL[agent.status]}</TableCell>
-              <TableCell>{agent.openTickets}</TableCell>
-              <TableCell>{agent.lastSeen ? formatRelative(agent.lastSeen) : "—"}</TableCell>
-              <TableCell>
-                {agent.status !== "deactivated" && (
-                  <Button variant="secondary" size="sm" onClick={() => setConfirming(agent)}>
-                    Deactivate
-                  </Button>
-                )}
-              </TableCell>
+      <div className="overflow-hidden rounded-lg border bg-card shadow-xs">
+        <Table aria-label="Agents">
+          <TableHeader>
+            <TableRow>
+              <TableHead>Agent</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Open tickets</TableHead>
+              <TableHead>Last seen</TableHead>
+              <TableHead>
+                <span className="sr-only">Actions</span>
+              </TableHead>
             </TableRow>
-          ))}
-        </tbody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {agents.map((agent) => (
+              <TableRow key={agent.id}>
+                <TableCell>
+                  <span className="flex items-center gap-3">
+                    <UserAvatar email={agent.email} name={agent.name} className="size-8" />
+                    <span className="min-w-0">
+                      <span className="block truncate font-medium">{agent.name}</span>
+                      <span className="block truncate text-xs text-muted-foreground">{agent.email}</span>
+                      {agent.status === "invited" && (
+                        <span className="block text-xs text-muted-foreground">Invited — activates on first sign-in</span>
+                      )}
+                    </span>
+                  </span>
+                </TableCell>
+                <TableCell>
+                  <Badge variant={STATUS_BADGE[agent.status]}>{STATUS_LABEL[agent.status]}</Badge>
+                </TableCell>
+                <TableCell>{agent.openTickets}</TableCell>
+                <TableCell className="text-muted-foreground">{agent.lastSeen ? formatRelative(agent.lastSeen) : "—"}</TableCell>
+                <TableCell className="text-right">
+                  {agent.status !== "deactivated" && (
+                    <Button variant="outline" size="sm" onClick={() => setConfirming(agent)}>
+                      Deactivate
+                    </Button>
+                  )}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
 
       <Dialog open={confirming !== null} onOpenChange={(open) => !open && setConfirming(null)}>
         <DialogContent>
@@ -86,18 +116,18 @@ export function AgentTable({ initialAgents }: { initialAgents: MockAgent[] }) {
               ? `Their ${confirming.openTickets} open tickets will be released to Pending.`
               : "They will lose access immediately."}
           </DialogDescription>
-          <div className="mt-4 flex justify-end gap-2">
-            <Button variant="secondary" size="sm" onClick={() => setConfirming(null)}>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setConfirming(null)}>
               Cancel
             </Button>
             <Button
-              variant="danger"
+              variant="destructive"
               size="sm"
               onClick={() => confirming && void deactivate(confirming)}
             >
               Deactivate
             </Button>
-          </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

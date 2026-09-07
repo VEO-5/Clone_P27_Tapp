@@ -2,7 +2,7 @@ import type { Role } from "@pearl27/contracts";
 
 /**
  * Provisional session cookie name. The API is authoritative for the real
- * name/flags; middleware only checks presence and never decodes it.
+ * name/flags; proxy only checks presence and never decodes it.
  */
 export const SESSION_COOKIE = "p27_session";
 
@@ -11,7 +11,7 @@ export type RoleName = Role;
 const LANDING: Record<RoleName, string> = {
   employee: "/tickets",
   agent: "/desk",
-  admin: "/admin",
+  admin: "/desk/admin",
 };
 
 export function landingForRole(role: RoleName | undefined): string {

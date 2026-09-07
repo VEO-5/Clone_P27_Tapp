@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { DashboardSeries } from "@pearl27/contracts";
 
 import { Panel, PanelHeader } from "@/components/ui/Panel";
-import { Skeleton } from "@/components/ui/Skeleton";
+import { Skeleton } from "@/components/shadcn/skeleton";
 
 function DataTable({ headers, rows }: { headers: string[]; rows: (string | number)[][] }) {
   return (

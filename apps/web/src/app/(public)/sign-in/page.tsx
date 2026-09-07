@@ -20,7 +20,7 @@ export default async function SignInPage({
           title="Sphere Support"
           description={
             MOCK
-              ? "Mock mode — pick a role to sign in. Google SSO takes over when the API ships."
+              ? "Use your Pearl 27 work email — we recognize your role. Admins invite agents and admins; everyone else signs in as an employee, no account needed."
               : "Use your Pearl 27 Google account. No email field, no passwords — Google handles it and the API sets your session."
           }
         />
@@ -28,7 +28,7 @@ export default async function SignInPage({
           {MOCK ? <MockSignInButtons next={next ?? "/"} /> : <SignInButton next={next ?? "/"} />}
           <p className="text-[13px] leading-relaxed text-fog">
             After sign-in, you land on your home: employees on My tickets, agents on the Desk,
-            admins on Admin.
+            admins on the Dashboard.
           </p>
         </div>
       </Panel>

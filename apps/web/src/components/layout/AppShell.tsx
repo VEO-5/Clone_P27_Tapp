@@ -3,7 +3,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 
-import { Toaster } from "@/components/ui/Toast";
+import { Toaster } from "@/components/shadcn/sonner";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const [client] = useState(

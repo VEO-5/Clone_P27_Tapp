@@ -6,17 +6,10 @@ import type {
   TextareaHTMLAttributes,
 } from "react";
 
+import { Input as ShadcnInput } from "@/components/shadcn/input";
+import { Label as ShadcnLabel } from "@/components/shadcn/label";
+import { Textarea as ShadcnTextarea } from "@/components/shadcn/textarea";
 import { cn } from "@/lib/utils";
-
-const CONTROL_BASE =
-  "w-full rounded-[2px] border bg-white px-4 font-sans text-[16px] text-pearl transition-all duration-200 " +
-  "placeholder:text-fog/80 hover:border-ink-600 focus:outline-none focus:ring-4 " +
-  "disabled:cursor-not-allowed disabled:opacity-60";
-
-const CONTROL_STATE = (invalid?: boolean) =>
-  invalid
-    ? "border-rose-400/60 focus:border-rose-400 focus:ring-rose-400/15"
-    : "border-ink-600 focus:border-iris-400 focus:ring-iris-500/15";
 
 export interface FieldProps {
   /** Must match the control's `id` so the label is programmatically linked. */
@@ -49,9 +42,9 @@ export function Field({
   return (
     <div className={cn("flex flex-col gap-2", className)}>
       <div className="flex items-baseline justify-between gap-3">
-        <label
+        <ShadcnLabel
           htmlFor={htmlFor}
-          className={cn("text-[13px] font-medium", night ? "text-cream" : "text-pearl-dim")}
+          className={cn(night ? "text-cream" : "text-pearl-dim")}
         >
           {label}
           {optional && (
@@ -59,7 +52,7 @@ export function Field({
               Optional
             </span>
           )}
-        </label>
+        </ShadcnLabel>
         {hint && !error && (
           <span className={cn("text-[11px]", night ? "text-haze" : "text-fog")} id={`${htmlFor}-hint`}>
             {hint}
@@ -73,7 +66,7 @@ export function Field({
         {error && (
           <p
             id={`${htmlFor}-error`}
-            className="flex items-start gap-1.5 text-[12.5px] text-rose-400"
+            className="flex items-start gap-1.5 text-[12.5px] text-destructive"
           >
             <AlertCircle className="mt-px size-3.5 shrink-0" aria-hidden />
             {error}
@@ -90,9 +83,9 @@ export function Input({
   ...props
 }: InputHTMLAttributes<HTMLInputElement> & { invalid?: boolean }) {
   return (
-    <input
+    <ShadcnInput
       aria-invalid={invalid || undefined}
-      className={cn(CONTROL_BASE, CONTROL_STATE(invalid), "h-12", className)}
+      className={cn(invalid && "border-destructive", className)}
       {...props}
     />
   );
@@ -104,14 +97,9 @@ export function Textarea({
   ...props
 }: TextareaHTMLAttributes<HTMLTextAreaElement> & { invalid?: boolean }) {
   return (
-    <textarea
+    <ShadcnTextarea
       aria-invalid={invalid || undefined}
-      className={cn(
-        CONTROL_BASE,
-        CONTROL_STATE(invalid),
-        "min-h-32 resize-y py-3 leading-relaxed",
-        className,
-      )}
+      className={cn(invalid && "border-destructive", className)}
       {...props}
     />
   );
@@ -123,14 +111,16 @@ export function Select({
   children,
   ...props
 }: SelectHTMLAttributes<HTMLSelectElement> & { invalid?: boolean }) {
+  // Deliberately native (not the Radix registry Select): it stays keyboard-
+  // and screen-reader-perfect in every browser, and Radix floating layers
+  // can't be unit-tested in jsdom. Styled to match the registry controls.
   return (
     <div className="relative">
       <select
         aria-invalid={invalid || undefined}
         className={cn(
-          CONTROL_BASE,
-          CONTROL_STATE(invalid),
-          "h-12 cursor-pointer appearance-none pr-11",
+          "h-9 w-full cursor-pointer appearance-none rounded-md border bg-background pr-9 pl-3 py-1 text-base text-foreground shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+          invalid ? "border-destructive" : "border-input",
           className,
         )}
         {...props}
@@ -140,7 +130,7 @@ export function Select({
       <svg
         aria-hidden
         viewBox="0 0 20 20"
-        className="pointer-events-none absolute right-4 top-1/2 size-4 -translate-y-1/2 text-fog"
+        className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
         fill="none"
         stroke="currentColor"
         strokeWidth="1.8"
@@ -157,7 +147,7 @@ export function CharCount({ value, max }: { value: string; max: number }) {
   const tight = remaining < max * 0.1;
 
   return (
-    <span className={cn("mono-ref text-[11px]", tight ? "text-gold-400" : "text-fog")}>
+    <span className={cn("mono-ref text-[11px]", tight ? "text-iris-700" : "text-fog")}>
       {value.length}/{max}
     </span>
   );

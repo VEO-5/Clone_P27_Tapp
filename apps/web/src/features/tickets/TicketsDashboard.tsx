@@ -4,16 +4,17 @@ import { useQuery } from "@tanstack/react-query";
 import type { Ticket } from "@pearl27/contracts";
 import { ArrowRight, Inbox } from "lucide-react";
 import { useState } from "react";
+import Link from "next/link";
 
-import { TicketCard } from "@/components/TicketCard";
-import { Button, LinkButton } from "@/components/ui/Button";
+import { TicketCard } from "@/features/tickets/TicketCard";
+import { Button } from "@/components/shadcn/button";
 import { NightStat } from "@/components/ui/NightStat";
-import { EmptyState, Panel, PanelHeader } from "@/components/ui/Panel";
-import { Skeleton } from "@/components/ui/Skeleton";
+import { EmptyState, Panel } from "@/components/ui/Panel";
+import { Skeleton } from "@/components/shadcn/skeleton";
 import { CsatPrompt } from "@/features/tickets/CsatPrompt";
 import { KnownIssueBanner } from "@/features/tickets/KnownIssueBanner";
+import { useSession } from "@/features/auth/useSession";
 import { apiFetch } from "@/lib/api";
-import { formatRelative } from "@/lib/utils";
 
 interface MyTicketsPage {
   items: Ticket[];
@@ -21,19 +22,13 @@ interface MyTicketsPage {
   counts: { pending: number; open: number; inProgress: number; resolved: number };
 }
 
-interface UpdateItem {
-  ticketId: string;
-  reference: string;
-  title: string;
-  message: string;
-  createdAt: string;
-}
-
-/** Employee dashboard (EA §6.7): counts, list, updates feed, banners, CSAT. */
+/** Employee dashboard (EA §6.7): counts, list, banners, CSAT. */
 export default function TicketsDashboard() {
   const [pages, setPages] = useState<Ticket[][]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [dismissedCsat, setDismissedCsat] = useState<string[]>([]);
+  const [dismissedDemotion, setDismissedDemotion] = useState(false);
+  const session = useSession();
 
   const mine = useQuery({
     queryKey: ["tickets", "mine", cursor ?? "first"],
@@ -42,10 +37,6 @@ export default function TicketsDashboard() {
       setPages((prev) => [...prev, page.items]);
       return page;
     },
-  });
-  const updates = useQuery({
-    queryKey: ["tickets", "mine", "updates"],
-    queryFn: () => apiFetch<{ items: UpdateItem[] }>("/tickets/mine/updates?limit=5"),
   });
   const issues = useQuery({
     queryKey: ["known-issues"],
@@ -70,11 +61,29 @@ export default function TicketsDashboard() {
           <p className="eyebrow">Your inbox</p>
           <h1 className="mt-3 font-display text-4xl tracking-tight text-pearl">My tickets</h1>
         </div>
-        <LinkButton href="/tickets/new" variant="secondary" size="sm">
-          Report an issue
-          <ArrowRight className="size-3.5" aria-hidden />
-        </LinkButton>
+        <Button variant="outline" size="sm" asChild>
+          <Link href="/tickets/new">
+            Report an issue
+            <ArrowRight className="size-3.5" aria-hidden />
+          </Link>
+        </Button>
       </div>
+
+      {session.data?.demoted && !dismissedDemotion && (
+        <div className="mb-6">
+          <Panel className="border-amber-200 bg-amber-50 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-[13.5px] leading-relaxed text-amber-800">
+                Your desk access was removed by an admin — you&apos;re signed in as an employee.
+                Your tickets and history are untouched.
+              </p>
+              <Button variant="ghost" size="sm" onClick={() => setDismissedDemotion(true)}>
+                Dismiss
+              </Button>
+            </div>
+          </Panel>
+        </div>
+      )}
 
       {issues.data?.[0] && (
         <div className="mb-6">
@@ -119,7 +128,11 @@ export default function TicketsDashboard() {
             icon={<Inbox className="size-5" aria-hidden />}
             title="No tickets yet"
             description="Submit a Sphere issue and it will land here with a live status."
-            action={<LinkButton href="/tickets/new">Report an issue</LinkButton>}
+            action={
+              <Button asChild>
+                <Link href="/tickets/new">Report an issue</Link>
+              </Button>
+            }
           />
         </Panel>
       ) : (
@@ -128,29 +141,12 @@ export default function TicketsDashboard() {
             <TicketCard key={ticket.id} ticket={ticket} />
           ))}
           {mine.data?.nextCursor && (
-            <Button variant="secondary" onClick={() => setCursor(mine.data!.nextCursor)} disabled={mine.isFetching}>
+            <Button variant="outline" onClick={() => setCursor(mine.data!.nextCursor)} disabled={mine.isFetching}>
               {mine.isFetching ? "Loading…" : "Load more"}
             </Button>
           )}
         </div>
       )}
-
-      <Panel className="mt-8">
-        <PanelHeader eyebrow="Latest status updates" title="What changed" />
-        <div className="flex flex-col gap-3 p-6">
-          {updates.isPending && <Skeleton className="h-12 w-full" />}
-          {updates.isError && <p className="text-sm text-fog">Updates are unavailable right now.</p>}
-          {updates.data?.items.length === 0 && <p className="text-sm text-fog">No updates yet.</p>}
-          {updates.data?.items.map((update) => (
-            <div key={`${update.ticketId}-${update.createdAt}`} className="border-l-2 border-iris-400/60 pl-3">
-              <p className="text-[13.5px] font-medium text-pearl">{update.message}</p>
-              <p className="mt-0.5 text-[12.5px] text-fog">
-                {update.reference} · {formatRelative(update.createdAt)}
-              </p>
-            </div>
-          ))}
-        </div>
-      </Panel>
     </div>
   );
 }

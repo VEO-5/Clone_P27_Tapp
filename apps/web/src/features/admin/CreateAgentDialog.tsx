@@ -2,9 +2,18 @@
 
 import { useState } from "react";
 import { agentEmailSchema } from "@pearl27/contracts";
+import { Loader2 } from "lucide-react";
 
-import { Button } from "@/components/ui/Button";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
+import { Button } from "@/components/shadcn/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogTitle,
+} from "@/components/shadcn/dialog";
+import { Input } from "@/components/shadcn/input";
+import { Label } from "@/components/shadcn/label";
 import { apiFetch, ApiError } from "@/lib/api";
 import type { MockAgent } from "@/mocks/fixtures";
 
@@ -50,34 +59,34 @@ export function CreateAgentDialog({ onCreated }: { onCreated: (agent: MockAgent)
           <DialogDescription>
             They activate on first Google sign-in with this address.
           </DialogDescription>
-          <form onSubmit={submit} className="mt-4 flex flex-col gap-3" noValidate>
-            <label htmlFor="agent-email" className="text-sm font-medium text-pearl">
-              Work email
-            </label>
-            <input
-              id="agent-email"
-              type="email"
-              autoComplete="email"
-              placeholder="ada@pearl27.com"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              aria-invalid={Boolean(error)}
-              aria-describedby={error ? "agent-email-error" : undefined}
-              className="min-h-11 rounded-[2px] border border-ink-600 bg-white px-3 text-sm text-pearl"
-            />
-            {error && (
-              <p id="agent-email-error" role="alert" className="text-[13px] text-rose-400">
-                {error}
-              </p>
-            )}
-            <div className="flex justify-end gap-2">
-              <Button variant="secondary" size="sm" type="button" onClick={() => setOpen(false)}>
+          <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="agent-email">Work email</Label>
+              <Input
+                id="agent-email"
+                type="email"
+                autoComplete="email"
+                placeholder="ada@pearl27.com"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                aria-invalid={Boolean(error)}
+                aria-describedby={error ? "agent-email-error" : undefined}
+              />
+              {error && (
+                <p id="agent-email-error" role="alert" className="text-[13px] text-destructive">
+                  {error}
+                </p>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" size="sm" type="button" onClick={() => setOpen(false)}>
                 Cancel
               </Button>
-              <Button size="sm" type="submit" loading={saving}>
+              <Button size="sm" type="submit" disabled={saving}>
+                {saving && <Loader2 className="animate-spin" aria-hidden />}
                 Send invite
               </Button>
-            </div>
+            </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>

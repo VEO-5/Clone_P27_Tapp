@@ -9,7 +9,7 @@ async function signInAsAgent(page: import("@playwright/test").Page) {
 async function signInAsAdmin(page: import("@playwright/test").Page) {
   await page.goto("/sign-in");
   await page.getByRole("button", { name: /continue as admin/i }).click();
-  await expect(page).toHaveURL(/\/admin/);
+  await expect(page).toHaveURL(/\/desk\/admin/);
 }
 
 // FE-4.8: unassigned ticket auto-claims on send.

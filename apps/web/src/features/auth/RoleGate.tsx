@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
 
-import { Skeleton } from "@/components/ui/Skeleton";
+import { Skeleton } from "@/components/shadcn/skeleton";
 import type { RoleName } from "@/lib/auth";
 import { landingForRole } from "@/lib/auth";
 

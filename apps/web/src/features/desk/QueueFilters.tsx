@@ -4,7 +4,16 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { Assignee, DeskTab } from "@pearl27/contracts";
 
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/Tabs";
+import { Button } from "@/components/shadcn/button";
+import { Input } from "@/components/shadcn/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/shadcn/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/shadcn/tabs";
 
 export interface QueueParams {
   tab: DeskTab;
@@ -51,7 +60,7 @@ export function queueQueryString(params: QueueParams): string {
 }
 
 /** Tabs + filters. URL is the source of truth (FE-3.4); search debounced 300ms. */
-export function QueueFilters({ agents }: { agents: Assignee[] }) {
+export function QueueFilters({ agents, isAdmin = false }: { agents: Assignee[]; isAdmin?: boolean }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const params = readQueueParams(searchParams);
@@ -67,6 +76,15 @@ export function QueueFilters({ agents }: { agents: Assignee[] }) {
   useEffect(() => {
     pendingRef.current = null;
   }, [searchParams]);
+
+  // Admins have no Mine tab — bounce them to All so URL, tabs, and data agree.
+  useEffect(() => {
+    if (!isAdmin || params.tab !== "mine") return;
+    const next = readQueueParams(new URLSearchParams(window.location.search));
+    next.tab = "all";
+    pendingRef.current = next;
+    router.replace(`/desk/queue${queueQueryString(next)}`, { scroll: false });
+  }, [isAdmin, params.tab, router]);
 
   function push(next: QueueParams) {
     pendingRef.current = next;
@@ -92,9 +110,6 @@ export function QueueFilters({ agents }: { agents: Assignee[] }) {
   // or focus would be stolen after every debounced keystroke.
   const searchKey = [params.tab, params.assigneeId, params.status, params.priority, params.categoryId, params.sort].join("|");
 
-  const selectClass =
-    "min-h-11 rounded-[2px] border border-ink-600 bg-white px-3 text-sm text-pearl";
-
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -104,9 +119,11 @@ export function QueueFilters({ agents }: { agents: Assignee[] }) {
         >
           <TabsList aria-label="Queue tabs">
             <TabsTrigger value="unassigned">Unassigned</TabsTrigger>
-            <TabsTrigger value="mine">Mine</TabsTrigger>
+            {/* No Mine tab for admins — they oversee the whole queue. */}
+            {!isAdmin && <TabsTrigger value="mine">Mine</TabsTrigger>}
             <TabsTrigger value="all">All</TabsTrigger>
-            <TabsTrigger value="by-agent">By agent</TabsTrigger>
+            {/* Admin-only oversight: agents stay focused on Unassigned / Mine / All. */}
+            {isAdmin && <TabsTrigger value="by-agent">By agent</TabsTrigger>}
           </TabsList>
         </Tabs>
 
@@ -114,92 +131,79 @@ export function QueueFilters({ agents }: { agents: Assignee[] }) {
           <label htmlFor="queue-search" className="sr-only">
             Search tickets
           </label>
-          <input
+          <Input
             id="queue-search"
             key={searchKey}
             type="search"
             placeholder="Search reference, title…"
             defaultValue={params.q}
             onChange={(event) => onSearchChange(event.target.value)}
-            className="min-h-11 w-full rounded-[2px] border border-ink-600 bg-white px-3 text-sm text-pearl lg:w-64"
+            className="h-9 w-full lg:w-64"
           />
-          <button
+          <Button
             type="button"
+            variant="outline"
             onClick={() => setFiltersOpen((open) => !open)}
             aria-expanded={filtersOpen}
-            className="inline-flex min-h-11 items-center rounded-[2px] border border-ink-600 bg-white px-4 text-sm font-medium text-pearl lg:hidden"
+            className="lg:hidden"
           >
             Filters
-          </button>
+          </Button>
         </div>
       </div>
 
       <div className={`${filtersOpen ? "flex" : "hidden"} flex-col gap-2 lg:flex lg:flex-row lg:items-center`}>
-        {params.tab === "by-agent" && (
-          <>
-            <label htmlFor="queue-agent" className="sr-only">
-              Agent
-            </label>
-            <select
-              id="queue-agent"
-              value={params.assigneeId}
-              onChange={(event) => set({ assigneeId: event.target.value })}
-              className={selectClass}
-            >
-              <option value="">Choose an agent</option>
+        {isAdmin && params.tab === "by-agent" && (
+          <Select value={params.assigneeId || "none"} onValueChange={(v) => set({ assigneeId: v === "none" ? "" : v })}>
+            <SelectTrigger aria-label="Filter by agent" className="w-full lg:w-44">
+              <SelectValue placeholder="Choose an agent" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Choose an agent</SelectItem>
               {agents.map((agent) => (
-                <option key={agent.id} value={agent.id}>
+                <SelectItem key={agent.id} value={agent.id}>
                   {agent.name}
-                </option>
+                </SelectItem>
               ))}
-            </select>
-          </>
+            </SelectContent>
+          </Select>
         )}
-        <label htmlFor="queue-status" className="sr-only">
-          Status
-        </label>
-        <select
-          id="queue-status"
-          value={params.status}
-          onChange={(event) => set({ status: event.target.value })}
-          className={selectClass}
-        >
-          <option value="">All statuses</option>
-          <option value="pending">Pending</option>
-          <option value="open">Open</option>
-          <option value="in_progress">In progress</option>
-          <option value="resolved">Resolved</option>
-        </select>
+        <Select value={params.status || "all"} onValueChange={(v) => set({ status: v === "all" ? "" : v })}>
+          <SelectTrigger aria-label="Filter by status" className="w-full lg:w-40">
+            <SelectValue placeholder="All statuses" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All statuses</SelectItem>
+            <SelectItem value="pending">Pending</SelectItem>
+            <SelectItem value="open">Open</SelectItem>
+            <SelectItem value="in_progress">In progress</SelectItem>
+            <SelectItem value="resolved">Resolved</SelectItem>
+          </SelectContent>
+        </Select>
 
-        <label htmlFor="queue-priority" className="sr-only">
-          Priority
-        </label>
-        <select
-          id="queue-priority"
-          value={params.priority}
-          onChange={(event) => set({ priority: event.target.value })}
-          className={selectClass}
-        >
-          <option value="">All priorities</option>
-          <option value="low">Low</option>
-          <option value="medium">Medium</option>
-          <option value="high">High</option>
-          <option value="urgent">Urgent</option>
-        </select>
+        <Select value={params.priority || "all"} onValueChange={(v) => set({ priority: v === "all" ? "" : v })}>
+          <SelectTrigger aria-label="Filter by priority" className="w-full lg:w-40">
+            <SelectValue placeholder="All priorities" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All priorities</SelectItem>
+            <SelectItem value="low">Low</SelectItem>
+            <SelectItem value="medium">Medium</SelectItem>
+            <SelectItem value="high">High</SelectItem>
+            <SelectItem value="urgent">Urgent</SelectItem>
+          </SelectContent>
+        </Select>
 
-        <label htmlFor="queue-sort" className="sr-only">
-          Sort
-        </label>
-        <select
-          id="queue-sort"
-          value={params.sort}
-          onChange={(event) => set({ sort: event.target.value })}
-          className={selectClass}
-        >
-          <option value="newest">Newest first</option>
-          <option value="oldest">Oldest first</option>
-          <option value="due">Due soonest</option>
-        </select>
+        <Select value={params.sort || "newest"} onValueChange={(v) => set({ sort: v })}>
+          <SelectTrigger aria-label="Sort tickets" className="w-full lg:w-40">
+            <SelectValue placeholder="Newest first" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="newest">Newest first</SelectItem>
+            <SelectItem value="oldest">Oldest first</SelectItem>
+            <SelectItem value="due">Due soonest</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
     </div>
   );

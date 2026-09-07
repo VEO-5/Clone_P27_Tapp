@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import type { Ticket } from "@pearl27/contracts";
-import { Star } from "lucide-react";
+import { Loader2, Star } from "lucide-react";
 
-import { Button } from "@/components/ui/Button";
+import { Button } from "@/components/shadcn/button";
 import { apiFetch, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -67,7 +67,7 @@ export function CsatPrompt({ ticket, onRated }: { ticket: Ticket; onRated: () =>
             className="grid size-11 place-items-center rounded-[2px] hover:bg-ink-900"
           >
             <Star
-              className={cn("size-5", value <= score ? "fill-gold-400 text-gold-400" : "text-fog")}
+              className={cn("size-5", value <= score ? "fill-iris-700 text-iris-700" : "text-fog")}
               aria-hidden
             />
           </button>
@@ -89,7 +89,8 @@ export function CsatPrompt({ ticket, onRated }: { ticket: Ticket; onRated: () =>
           {error}
         </p>
       )}
-      <Button type="submit" size="sm" loading={sending} className="mt-3">
+      <Button type="submit" size="sm" disabled={sending} className="mt-3">
+        {sending && <Loader2 className="animate-spin" aria-hidden />}
         Send rating
       </Button>
     </form>

@@ -2,17 +2,18 @@
 
 import { useQuery } from "@tanstack/react-query";
 import type { Attachment, Ticket, TicketEvent } from "@pearl27/contracts";
-import { ArrowLeft, MessageCircle, SearchX } from "lucide-react";
+import { ArrowLeft, SearchX } from "lucide-react";
+import Link from "next/link";
 
-import { AttachmentList } from "@/components/AttachmentList";
+import { AttachmentList } from "@/features/tickets/AttachmentList";
 import { CopyButton } from "@/components/CopyButton";
-import { LinkButton } from "@/components/ui/Button";
+import { Button } from "@/components/shadcn/button";
 import { PriorityBadge, StatusBadge } from "@/components/ui/Badge";
 import { EmptyState, Panel, PanelHeader } from "@/components/ui/Panel";
-import { Skeleton } from "@/components/ui/Skeleton";
+import { Skeleton } from "@/components/shadcn/skeleton";
 import { CsatPrompt } from "@/features/tickets/CsatPrompt";
 import { StatusTimeline } from "@/features/tickets/StatusTimeline";
-import { categoryName } from "@/components/TicketCard";
+import { categoryName } from "@/features/tickets/categories";
 import { ApiError, apiFetch } from "@/lib/api";
 import { formatDateTime } from "@/lib/utils";
 
@@ -63,17 +64,13 @@ export function TicketDetail({ reference }: { reference: string }) {
             action={
               <div className="flex flex-col gap-2 sm:flex-row">
                 {notFound || forbidden ? (
-                  <LinkButton href="/tickets" variant="night">
-                    Back to My tickets
-                  </LinkButton>
+                  <Button variant="ghost" asChild>
+                    <Link href="/tickets">Back to My tickets</Link>
+                  </Button>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => detail.refetch()}
-                    className="inline-flex min-h-11 items-center justify-center rounded-[2px] bg-iris-500 px-7 text-sm font-medium text-white"
-                  >
+                  <Button type="button" onClick={() => detail.refetch()}>
                     Retry
-                  </button>
+                  </Button>
                 )}
               </div>
             }
@@ -88,9 +85,11 @@ export function TicketDetail({ reference }: { reference: string }) {
 
   return (
     <div className="mx-auto max-w-3xl px-4 pb-8 pt-10 sm:px-6 sm:pt-14">
-      <LinkButton href="/tickets" variant="ghost" size="sm" className="-ml-3 mb-6">
-        <ArrowLeft className="size-3.5" aria-hidden /> Back to My tickets
-      </LinkButton>
+      <Button variant="ghost" size="sm" className="-ml-3 mb-6" asChild>
+        <Link href="/tickets">
+          <ArrowLeft className="size-3.5" aria-hidden /> Back to My tickets
+        </Link>
+      </Button>
 
       <Panel lit>
         <PanelHeader
@@ -142,24 +141,6 @@ export function TicketDetail({ reference }: { reference: string }) {
           <section>
             <p className="eyebrow mb-4">Updates</p>
             <StatusTimeline events={ticket.events} />
-          </section>
-
-          <section className="rounded-[4px] border border-cream/10 border-l-2 border-l-iris-400 bg-night px-4 py-3.5">
-            <p className="eyebrow mb-1.5">Need to add something?</p>
-            <p className="text-[15px] font-medium text-cream">
-              Reply to the Sphere Support message in Google Chat
-            </p>
-            {ticket.chatDmUrl && (
-              <a
-                href={ticket.chatDmUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-[2px] bg-iris-500 px-7 text-sm font-medium text-white hover:bg-iris-600"
-              >
-                <MessageCircle className="size-4" aria-hidden />
-                Open Google Chat
-              </a>
-            )}
           </section>
 
           {showCsat && (

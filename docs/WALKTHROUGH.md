@@ -17,7 +17,7 @@ Pearl 27 employees submit Sphere account issues, attach screenshots, and track s
 1. **Submit** (`/`) — fill the form, drop a screenshot, submit. Confirmation shows the reference and a "Track this ticket" link.
 2. **My tickets** (`/my-tickets`) — sign in with the same work email (no password). Every ticket and its status stay on this page for 30 days.
 3. **Track** (`/track/PRL-…`) — one ticket: status badge, attachments, chronological timeline.
-4. **Admin** (`/admin`) — access code (default `pearl27` locally). KPI cards, search, status filter.
+4. **Admin** (`/admin`) — sign in with an invited work email. KPI cards, search, status filter. Invite agents/admins by email; deactivated accounts fall back to employee.
 5. **Triage** (`/admin/tickets/[id]`) — move Open → In progress → Resolved, change priority, post a reply. Reload the employee page: the timeline updated.
 6. **Sign out** — cookie cleared; `/admin` returns to login.
 

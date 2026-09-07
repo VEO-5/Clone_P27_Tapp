@@ -11,9 +11,15 @@ import { queryKeys } from "@/lib/query";
 
 import { mockSignOut } from "./mockSession";
 
+/** Session profile: the API contract plus mock-only flags. */
+export interface SessionProfile extends Profile {
+  /** True when a deactivated desk/admin account fell back to employee. */
+  demoted?: boolean;
+}
+
 /** Session query on GET /auth/me, cached for the session. 401 = signed out. */
 export function useSession() {
-  return useQuery<Profile, ApiError>({
+  return useQuery<SessionProfile, ApiError>({
     queryKey: queryKeys.me,
     queryFn: () => apiFetch<Profile>("/auth/me"),
     staleTime: Infinity,
@@ -33,7 +39,11 @@ export function useSignOut() {
     } catch {
       // Clearing local state matters more than the server round-trip.
     } finally {
-      if (config.apiMock) mockSignOut();
+      if (config.apiMock) {
+        // Confirm the worker forgot the session BEFORE touching local
+        // state — navigating on a live session is how sign-out "unsticks".
+        await mockSignOut();
+      }
       queryClient.clear();
       router.push("/sign-in");
       router.refresh();

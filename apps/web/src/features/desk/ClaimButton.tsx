@@ -3,13 +3,15 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { DeskTicket } from "@pearl27/contracts";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/Button";
+import { Button } from "@/components/shadcn/button";
 import { ApiError, apiFetch } from "@/lib/api";
+import { cn } from "@/lib/utils";
 
 /** Pessimistic claim: 409 names the winner and refreshes the row (FE-3.7). */
-export function ClaimButton({ ticket }: { ticket: DeskTicket }) {
+export function ClaimButton({ ticket, compact = false, className }: { ticket: DeskTicket; compact?: boolean; className?: string }) {
   const queryClient = useQueryClient();
   const [claiming, setClaiming] = useState(false);
 
@@ -35,7 +37,16 @@ export function ClaimButton({ ticket }: { ticket: DeskTicket }) {
   }
 
   return (
-    <Button size="sm" loading={claiming} onClick={() => void claim()} aria-label={`Assign ${ticket.reference} to me`}>
+    <Button
+      size={compact ? "xs" : "sm"}
+      variant={compact ? "outline" : "default"}
+      disabled={claiming}
+      onClick={() => void claim()}
+      aria-label={`Assign ${ticket.reference} to me`}
+      aria-busy={claiming || undefined}
+      className={cn(className)}
+    >
+      {claiming && <Loader2 className="animate-spin" aria-hidden />}
       Assign to me
     </Button>
   );

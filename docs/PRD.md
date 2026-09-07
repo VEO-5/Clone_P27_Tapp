@@ -36,7 +36,8 @@ Pearl 27 employees experience issues with their Sphere accounts and need a fast,
 - Ticket detail: status badge, priority, submitted files, and a chronological **event timeline** (created, status changes, support replies).
 
 ### 4.3 Admin dashboard (exceeds brief)
-- Access-code login (HTTP-only cookie session). Upgrade path: Supabase Auth + roles.
+- Email identity for every role (no shared access-code: one leak must never compromise the whole desk). Employees sign in with any `@pearl27.com` address; agent/admin powers are granted by admin invite only — unknown addresses can only ever be employees.
+- Deactivation demotes instead of locking out: a deactivated agent/admin signs in as a normal employee with history intact, plus a one-time notice.
 - KPI cards: open, in progress, resolved, total.
 - Ticket table: search, filter by status/priority, sorted newest first.
 - Ticket detail: change status, change priority, post a reply (visible on the employee timeline), view/download attachments via signed URLs.
@@ -54,7 +55,7 @@ Pearl 27 employees experience issues with their Sphere accounts and need a fast,
 | **Next.js 15 (App Router, TypeScript)** — one app in `frontend/`; API route handlers run on the **Node.js runtime** and are the backend | One codebase, one deploy → live URL fastest. Route handlers are real Node server code (validation, Supabase service-role access, email). A separate Express service would double deploy surface for zero user value in this timebox. |
 | **Supabase (Postgres + Storage)** | Managed, instant, SQL migrations in-repo (`supabase/schema.sql`). Storage bucket is **private**; files served via short-lived signed URLs. |
 | **RLS locked down; all DB access via service-role key on the server only** | No anon key exposure of data; browser never talks to the DB directly. |
-| **Access-code admin session (HTTP-only, SameSite=Lax cookie)** | Right-sized auth for the timebox; documented upgrade path to Supabase Auth. |
+| **Access-code admin session (HTTP-only, SameSite=Lax cookie)** → **replaced: email identity, invite-only elevation** | A shared code is a single point of compromise with no audit trail. Per-user email identity + admin invites + demote-on-deactivate replaced it before production. |
 | **Tailwind CSS v4 + hand-built design system** | Distinctive "pearl" brand (ivory surface, deep ink, iridescent accent) instead of a generic component-library look. |
 | **Deploy: Vercel** | Zero-config Next.js hosting, env vars in dashboard. |
 

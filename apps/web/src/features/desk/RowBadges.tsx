@@ -26,7 +26,7 @@ export function SlaBadge({ ticket }: { ticket: DeskTicket }) {
   }
   if (sla.breachingSoon) {
     return (
-      <span className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-gold-400" role="status">
+      <span className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-iris-700" role="status">
         <span className="size-1.5 rounded-full bg-gold-400" aria-hidden />
         Due in {relativeFuture(sla.dueAt)}
       </span>

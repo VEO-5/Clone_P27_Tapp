@@ -252,6 +252,14 @@ export function deskDashboard(rangeDays: number): DeskDashboard {
       resolvedByMeToday: 2,
       resolvedByMeWeek: 11,
       myAvgResolutionHours: 26.5,
+      trends: {
+        unassigned: "+2 vs last week",
+        pending: "-1 vs last week",
+        mine: "+1 vs last week",
+        breachingSoon: "+0 vs last week",
+        receivedToday: "+3 vs yesterday",
+        resolvedByMeToday: "+1 vs yesterday",
+      },
     },
     series: { receivedVsResolved, byStatus, byCategory, ageBuckets },
   };

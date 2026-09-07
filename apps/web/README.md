@@ -52,7 +52,7 @@ Values live in `frontend/.env` (gitignored). `.env.example` is placeholders only
 | `/my-tickets` | Employee (cookie) | Inbox: Open / In progress / Resolved / Closed + every ticket. Redirects to login if signed out |
 | `/track` | Anyone | Look up by `PRL-XXXXXX` or email (email also opens My tickets) |
 | `/track/[reference]` | Anyone with the code | One ticket: status, attachments, timeline |
-| `/admin/login` | Support | Access-code sign in |
+| `/admin/login` | Support | Email sign-in (invited work email; unknown addresses can only be employees) |
 | `/admin` | Support (cookie) | Queue: KPI cards, search, status/priority filters. Redirects to login if signed out |
 | `/admin/tickets/[id]` | Support (cookie) | Change status/priority, reply, view attachments |
 
@@ -69,7 +69,7 @@ Values live in `frontend/.env` (gitignored). `.env.example` is placeholders only
 | `GET` | `/api/attachments/[id]` | Public (unguessable id) | File via signed URL or streamed bytes |
 | `POST` | `/api/me/login` | Public | Employee session cookie from `{ email }` |
 | `DELETE` | `/api/me/login` | Cookie | Employee sign out |
-| `POST` | `/api/admin/login` | Public | Support session from `{ accessCode }` |
+| `POST` | `/api/admin/login` | Public | Support session from invited `{ email }` (no shared access-code) |
 | `DELETE` | `/api/admin/login` | Cookie | Support sign out |
 | `GET` | `/api/admin/tickets` | Support | Queue + stats. Query: `?q=&status=&priority=` |
 | `GET` | `/api/admin/tickets/[id]` | Support | Full ticket for the desk |

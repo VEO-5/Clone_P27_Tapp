@@ -9,10 +9,8 @@ const COPY: Record<string, { title: string; body: string }> = {
     title: "Wrong account domain",
     body: "Sphere Support is for Pearl 27 Google accounts only. Try again with your @pearl27.com address.",
   },
-  deactivated: {
-    title: "Account deactivated",
-    body: "Your account was deactivated by an admin. Contact System Support if you think this is a mistake.",
-  },
+  // Note: deactivated desk/admin accounts are demoted to employee at
+  // sign-in — they never land here. This page is for gate denials only.
 };
 
 export default async function AuthDeniedPage({

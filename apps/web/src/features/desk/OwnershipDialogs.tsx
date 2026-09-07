@@ -3,10 +3,19 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Assignee, DeskTicket } from "@pearl27/contracts";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/Button";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
+import { Button } from "@/components/shadcn/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogTitle,
+} from "@/components/shadcn/dialog";
+import { Input } from "@/components/shadcn/input";
+import { Label } from "@/components/shadcn/label";
 import { apiFetch, ApiError } from "@/lib/api";
 
 /** Release to unassigned — reason optional (FE-3.8). Assignee or admin only. */
@@ -37,7 +46,7 @@ export function ReleaseDialog({ ticket }: { ticket: DeskTicket }) {
 
   return (
     <>
-      <Button variant="secondary" size="sm" onClick={() => setOpen(true)}>
+      <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
         Release
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
@@ -46,26 +55,28 @@ export function ReleaseDialog({ ticket }: { ticket: DeskTicket }) {
           <DialogDescription>
             It returns to Unassigned + Pending. A reason helps the next agent pick it up.
           </DialogDescription>
-          <form onSubmit={submit} className="mt-4 flex flex-col gap-3">
-            <label htmlFor={`release-reason-${ticket.id}`} className="text-sm font-medium text-pearl">
-              Reason <span className="font-normal text-fog">(optional)</span>
-            </label>
-            <input
-              id={`release-reason-${ticket.id}`}
-              value={reason}
-              onChange={(event) => setReason(event.target.value)}
-              maxLength={500}
-              placeholder="e.g. Handing over shift"
-              className="min-h-11 rounded-[2px] border border-ink-600 bg-white px-3 text-sm text-pearl"
-            />
-            <div className="flex justify-end gap-2">
-              <Button variant="secondary" size="sm" type="button" onClick={() => setOpen(false)}>
+          <form onSubmit={submit} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor={`release-reason-${ticket.id}`}>
+                Reason <span className="font-normal text-muted-foreground">(optional)</span>
+              </Label>
+              <Input
+                id={`release-reason-${ticket.id}`}
+                value={reason}
+                onChange={(event) => setReason(event.target.value)}
+                maxLength={500}
+                placeholder="e.g. Handing over shift"
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" size="sm" type="button" onClick={() => setOpen(false)}>
                 Cancel
               </Button>
-              <Button size="sm" type="submit" loading={saving}>
+              <Button size="sm" type="submit" disabled={saving}>
+                {saving && <Loader2 className="animate-spin" aria-hidden />}
                 Release ticket
               </Button>
-            </div>
+            </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
@@ -101,38 +112,39 @@ export function AssignDialog({ ticket, agents }: { ticket: DeskTicket; agents: A
 
   return (
     <>
-      <Button variant="secondary" size="sm" onClick={() => setOpen(true)}>
+      <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
         Assign…
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogTitle>Assign {ticket.reference}</DialogTitle>
           <DialogDescription>Pick the agent who owns this ticket next.</DialogDescription>
-          <form onSubmit={submit} className="mt-4 flex flex-col gap-3">
-            <label htmlFor={`assign-agent-${ticket.id}`} className="text-sm font-medium text-pearl">
-              Agent
-            </label>
-            <select
-              id={`assign-agent-${ticket.id}`}
-              value={assigneeId}
-              onChange={(event) => setAssigneeId(event.target.value)}
-              className="min-h-11 rounded-[2px] border border-ink-600 bg-white px-3 text-sm text-pearl"
-            >
-              <option value="">Choose an agent</option>
-              {agents.map((agent) => (
-                <option key={agent.id} value={agent.id}>
-                  {agent.name}
-                </option>
-              ))}
-            </select>
-            <div className="flex justify-end gap-2">
-              <Button variant="secondary" size="sm" type="button" onClick={() => setOpen(false)}>
+          <form onSubmit={submit} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor={`assign-agent-${ticket.id}`}>Agent</Label>
+              <select
+                id={`assign-agent-${ticket.id}`}
+                value={assigneeId}
+                onChange={(event) => setAssigneeId(event.target.value)}
+                className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+              >
+                <option value="">Choose an agent</option>
+                {agents.map((agent) => (
+                  <option key={agent.id} value={agent.id}>
+                    {agent.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" size="sm" type="button" onClick={() => setOpen(false)}>
                 Cancel
               </Button>
-              <Button size="sm" type="submit" loading={saving} disabled={!assigneeId}>
+              <Button size="sm" type="submit" disabled={saving || !assigneeId}>
+                {saving && <Loader2 className="animate-spin" aria-hidden />}
                 Assign
               </Button>
-            </div>
+            </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>

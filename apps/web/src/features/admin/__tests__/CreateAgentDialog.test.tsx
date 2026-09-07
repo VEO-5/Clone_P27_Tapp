@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { CreateAgentDialog } from "@/features/admin/CreateAgentDialog";
+import { setMockSession } from "@/mocks/fixtures";
 import { renderWithProviders } from "@/test/render";
 
 describe("CreateAgentDialog", () => {
@@ -20,6 +21,7 @@ describe("CreateAgentDialog", () => {
   });
 
   it("FE-1.6: pearl27 address sends POST and the row appears as Invited", async () => {
+    setMockSession("admin");
     const user = userEvent.setup();
     const onCreated = vi.fn();
     renderWithProviders(<CreateAgentDialog onCreated={onCreated} />);

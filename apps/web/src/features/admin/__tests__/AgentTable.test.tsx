@@ -3,11 +3,12 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import { AgentTable } from "@/features/admin/AgentTable";
-import { resetAgents, mockAgents } from "@/mocks/fixtures";
+import { resetAgents, mockAgents, setMockSession } from "@/mocks/fixtures";
 import { renderWithProviders } from "@/test/render";
 
 describe("AgentTable", () => {
   it("FE-1.7: deactivate names the open-ticket count and marks the row Deactivated", async () => {
+    setMockSession("admin");
     resetAgents();
     const user = userEvent.setup();
     const target = mockAgents.find((agent) => agent.openTickets > 0 && agent.status === "active")!;

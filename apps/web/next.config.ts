@@ -10,6 +10,9 @@ const nextConfig: NextConfig = {
       { source: "/track/:reference", destination: "/tickets/:reference", permanent: false },
       { source: "/admin/login", destination: "/sign-in", permanent: false },
       { source: "/admin/tickets/:id", destination: "/desk/tickets/:id", permanent: false },
+      // Admin moved inside the desk shell — old bookmarks follow (non-permanent).
+      { source: "/admin", destination: "/desk/admin", permanent: false },
+      { source: "/admin/:path*", destination: "/desk/admin/:path*", permanent: false },
     ];
   },
 };

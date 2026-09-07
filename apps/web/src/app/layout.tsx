@@ -3,7 +3,10 @@ import { Inter, JetBrains_Mono, Plus_Jakarta_Sans } from "next/font/google";
 
 import { AppShell } from "@/components/layout/AppShell";
 import { MockProvider } from "@/components/MockProvider";
-import { SessionHeader } from "@/components/SessionHeader";
+import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
+import { SessionHeader } from "@/components/layout/SessionHeader";
+import { TooltipProvider } from "@/components/shadcn/tooltip";
+import { WebVitals } from "@/components/WebVitals";
 
 import "./globals.css";
 
@@ -33,7 +36,13 @@ export const metadata: Metadata = {
   description:
     "Submit and track Sphere account issues with Pearl 27 System Support. Attach screenshots, get a reference, and follow every update.",
   applicationName: "Pearl 27 Sphere Support",
-  icons: { icon: "/pearl27-logo.png" },
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Pearl 27",
+  },
+  icons: { icon: "/pearl27-logo.png", apple: "/pearl27-logo.png" },
   openGraph: {
     title: "Sphere Support · Pearl 27",
     description: "Report a Sphere issue and track it end to end.",
@@ -52,6 +61,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${sans.variable} ${display.variable} ${jetbrains.variable} h-full antialiased`}
     >
       <body className="relative flex min-h-full flex-col">
+        <TooltipProvider>
         <div className="relative z-10 flex min-h-full flex-1 flex-col">
           <a
             href="#main"
@@ -67,7 +77,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </main>
             </MockProvider>
           </AppShell>
+          <ServiceWorkerRegister />
+          <WebVitals />
         </div>
+        </TooltipProvider>
       </body>
     </html>
   );

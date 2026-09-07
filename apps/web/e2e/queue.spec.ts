@@ -6,15 +6,29 @@ async function signInAsAgent(page: import("@playwright/test").Page) {
   await expect(page).toHaveURL(/\/desk/);
 }
 
-// FE-3.1: cards + four charts with hidden tables.
-test("FE-3.1: agent dashboard renders cards and charts", async ({ page }) => {
+async function signInAsAdmin(page: import("@playwright/test").Page) {
+  await page.goto("/sign-in");
+  await page.getByRole("button", { name: /continue as admin/i }).click();
+  await expect(page).toHaveURL(/\/desk\/admin/);
+}
+
+// FE-3.1a: agents see only Unassigned / Mine / All — no By agent tab.
+test("FE-3.1a: agent queue tabs exclude By agent", async ({ page }) => {
   await signInAsAgent(page);
+  await page.goto("/desk/queue?tab=all");
+  await expect(page.getByRole("tab", { name: /unassigned/i })).toBeVisible();
+  await expect(page.getByRole("tab", { name: /^mine$/i })).toBeVisible();
+  await expect(page.getByRole("tab", { name: /^all$/i })).toBeVisible();
+  await expect(page.getByRole("tab", { name: /by agent/i })).toHaveCount(0);
+});
+
+// FE-3.1: stat cards + flat ticket grid.
+test("FE-3.1: agent dashboard renders stat cards and grid", async ({ page }) => {
+  await signInAsAgent(page);
+  await expect(page.getByRole("heading", { name: "Tickets", exact: true })).toBeVisible();
+  await expect(page.getByText(/total tickets/i).first()).toBeVisible();
+  await expect(page.getByLabel("Tickets grid")).toBeVisible();
   await expect(page.getByText("Unassigned", { exact: true })).toBeVisible();
-  await expect(page.getByText(/received vs resolved/i)).toBeVisible();
-  await expect(page.getByText(/my open tickets by status/i)).toBeVisible();
-  await expect(page.getByText(/category breakdown/i)).toBeVisible();
-  await expect(page.getByText(/ticket age/i)).toBeVisible();
-  expect(await page.locator("table").count()).toBeGreaterThanOrEqual(4);
 });
 
 // FE-3.2: Unassigned card deep-links into the queue.
@@ -36,8 +50,10 @@ test("FE-3.3: queue opens on Mine", async ({ page }) => {
 test("FE-3.4: filter, search, reload restores", async ({ page }) => {
   await signInAsAgent(page);
   await page.goto("/desk/queue?tab=all");
-  await page.getByLabel(/status/i).selectOption("pending");
-  await page.getByLabel(/priority/i).selectOption("urgent");
+  await page.getByLabel(/status/i).click();
+  await page.getByRole("option", { name: "Pending", exact: true }).click();
+  await page.getByLabel(/priority/i).click();
+  await page.getByRole("option", { name: "Urgent", exact: true }).click();
   await page.getByLabel(/search tickets/i).fill("sphere");
   await expect(page).toHaveURL(/status=pending/);
   await expect(page).toHaveURL(/priority=urgent/);
@@ -48,17 +64,20 @@ test("FE-3.4: filter, search, reload restores", async ({ page }) => {
   await expect(page).toHaveURL(/status=pending/);
 });
 
-// FE-3.5: by-agent shows a locked view with no controls except View.
-test("FE-3.5: by-agent Ada is padlocked and read-only", async ({ page }) => {
-  await signInAsAgent(page);
-  await page.goto("/desk/queue?tab=by-agent");
-  await page.getByLabel(/agent/i).selectOption("u-agent-2");
+// FE-3.5: by-agent is admin-only oversight of an agent's queue.
+test("FE-3.5: admin can inspect Ada's queue via by-agent", async ({ page }) => {
+  await signInAsAdmin(page);
+  await page.goto("/desk/queue?tab=all");
+  await expect(page.getByRole("tab", { name: /by agent/i })).toBeVisible();
+  await page.getByRole("tab", { name: /by agent/i }).click();
+  await page.getByLabel(/agent/i).click();
+  await page.getByRole("option", { name: /ada osei/i }).click();
   await expect(page.getByText(/shared drive permissions/i)).toBeVisible();
-  const region = page.locator("article").first();
-  await expect(region.getByText(/ada osei/i).first()).toBeVisible();
+  const row = page.locator("article, tr[data-ticket-row]").first();
+  await expect(row).toBeVisible();
   await expect(page.getByRole("button", { name: /assign .* to me/i })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: /^release$/i })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "View" }).first()).toBeVisible();
+  // Row title links into the ticket detail (no separate View button).
+  await expect(row.getByRole("link").first()).toBeVisible();
 });
 
 // FE-3.14: activity feed renders and the Live indicator connects.
@@ -85,8 +104,9 @@ test("FE-3.15: mobile queue layout", async ({ page }) => {
 test("FE-3.17: load more appends unique rows", async ({ page }) => {
   await signInAsAgent(page);
   await page.goto("/desk/queue?tab=all");
-  const refs = () => page.locator("article").evaluateAll((nodes) => nodes.map((n) => n.getAttribute("aria-label") ?? ""));
-  await expect(page.locator("article").first()).toBeVisible();
+  const rows = () => page.locator("article, tr[data-ticket-row]");
+  const refs = () => rows().evaluateAll((nodes) => nodes.map((n) => n.getAttribute("aria-label") ?? ""));
+  await expect(rows().first()).toBeVisible();
   const before = await refs();
   await page.getByRole("button", { name: /load more/i }).click();
   await expect(async () => {

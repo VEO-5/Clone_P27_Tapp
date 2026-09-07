@@ -1,7 +1,7 @@
 "use client";
 
-import { AgentDashboard } from "@/features/desk/AgentDashboard";
+import { DeskBoard } from "@/features/desk/DeskBoard";
 
 export default function DeskPage() {
-  return <AgentDashboard />;
+  return <DeskBoard />;
 }

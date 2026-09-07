@@ -49,6 +49,11 @@ export const Category = z.object({
 });
 export type Category = z.infer<typeof Category>;
 
+export const categoryInputSchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(60, "Keep it under 60 characters"),
+  formSchema: z.unknown().optional(),
+});
+
 // ---------------------------------------------------------------------------
 // Domain shapes
 // ---------------------------------------------------------------------------
@@ -235,6 +240,8 @@ export const DeskDashboardCards = z.object({
   resolvedByMeToday: z.number(),
   resolvedByMeWeek: z.number(),
   myAvgResolutionHours: z.number().nullable().optional(),
+  /** Optional "vs last period" deltas per card key (Image-1 style). */
+  trends: z.record(z.string(), z.string()).optional(),
 });
 export type DeskDashboardCards = z.infer<typeof DeskDashboardCards>;
 
@@ -298,3 +305,130 @@ export function validateFiles(files: readonly { name: string; size: number; type
   }
   return errors;
 }
+
+// ---------------------------------------------------------------------------
+// Admin analytics + management (Phase 5)
+// ---------------------------------------------------------------------------
+
+export const DateRange = z.enum(["7", "30", "90"]);
+export type DateRange = z.infer<typeof DateRange>;
+
+export const AdminKpi = z.object({
+  key: z.string(),
+  label: z.string(),
+  value: z.string(),
+  deltaPct: z.number(),
+  deltaLabel: z.string(),
+  spark: z.array(z.number()),
+  upGood: z.boolean().optional(),
+});
+export type AdminKpi = z.infer<typeof AdminKpi>;
+
+export const VolumePoint = z.object({
+  date: z.string(),
+  received: z.number(),
+  resolved: z.number(),
+});
+export type VolumePoint = z.infer<typeof VolumePoint>;
+
+export const SlaRow = z.object({
+  ticketId: z.string(),
+  reference: z.string(),
+  subject: z.string(),
+  priority: TicketPriority,
+  assigneeName: z.string(),
+  status: TicketStatus,
+  dueAt: z.string().nullable(),
+  dueLabel: z.string(),
+  breached: z.boolean(),
+});
+export type SlaRow = z.infer<typeof SlaRow>;
+
+export const AdminDashboardResponse = z.object({
+  rangeDays: z.number(),
+  kpis: z.array(AdminKpi),
+  volume: z.array(VolumePoint),
+  byAgent: z.array(
+    z.object({
+      agentId: z.string(),
+      name: z.string(),
+      received: z.number(),
+      assigned: z.number(),
+      resolved: z.number(),
+      open: z.number(),
+      avgResolutionHours: z.number(),
+      avgFirstResponseHours: z.number(),
+    }),
+  ),
+  slaTable: z.array(SlaRow),
+  updates: z.array(ActivityItem),
+});
+export type AdminDashboardResponse = z.infer<typeof AdminDashboardResponse>;
+
+export const BusinessHoursDay = z.object({
+  day: z.string(),
+  open: z.string(),
+  close: z.string(),
+  closed: z.boolean(),
+});
+export type BusinessHoursDay = z.infer<typeof BusinessHoursDay>;
+
+export const Holiday = z.object({
+  date: z.string(),
+  label: z.string(),
+});
+export type Holiday = z.infer<typeof Holiday>;
+
+export const CannedResponse = z.object({
+  id: z.string(),
+  shortcut: z.string(),
+  title: z.string(),
+  body: z.string(),
+});
+export type CannedResponse = z.infer<typeof CannedResponse>;
+
+export const AdminSettings = z.object({
+  autoReleaseWorkingDays: z.number().int().min(1, "Use at least 1 working day"),
+  businessHours: z.array(BusinessHoursDay),
+  holidays: z.array(Holiday),
+  cannedResponses: z.array(CannedResponse),
+});
+export type AdminSettings = z.infer<typeof AdminSettings>;
+
+export const settingsSchema = z.object({
+  autoReleaseWorkingDays: z.coerce.number().int().min(1, "Use at least 1 working day"),
+});
+export type SettingsInput = z.infer<typeof settingsSchema>;
+
+export const KnownIssueSeverity = z.enum(["minor", "major", "critical"]);
+export type KnownIssueSeverity = z.infer<typeof KnownIssueSeverity>;
+
+export const KnownIssue = z.object({
+  id: z.string(),
+  title: z.string().min(1),
+  message: z.string().min(1),
+  severity: KnownIssueSeverity,
+  startsAt: z.string(),
+  endsAt: z.string().nullable(),
+  active: z.boolean(),
+});
+export type KnownIssue = z.infer<typeof KnownIssue>;
+
+export const knownIssueSchema = z.object({
+  title: z.string().trim().min(5, "Give the issue a short title (at least 5 characters)"),
+  message: z.string().trim().min(20, "Explain it in at least 20 characters"),
+  severity: KnownIssueSeverity,
+  endsAt: z.string().optional(),
+});
+export type KnownIssueInput = z.infer<typeof knownIssueSchema>;
+
+export const AuditItem = z.object({
+  id: z.string(),
+  actor: z.string(),
+  action: z.string(),
+  entity: z.string(),
+  summary: z.string(),
+  createdAt: z.string(),
+  diff: z.record(z.string(), z.unknown()).optional(),
+});
+export type AuditItem = z.infer<typeof AuditItem>;

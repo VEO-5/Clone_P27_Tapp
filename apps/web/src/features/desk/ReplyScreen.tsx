@@ -3,16 +3,17 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Assignee, Attachment, DeskTicket, Message, TicketEvent } from "@pearl27/contracts";
 import { ArrowLeft, Lock, SearchX } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { AttachmentList } from "@/components/AttachmentList";
+import { AttachmentList } from "@/features/tickets/AttachmentList";
 import { CopyButton } from "@/components/CopyButton";
-import { LinkButton } from "@/components/ui/Button";
+import { Button } from "@/components/shadcn/button";
 import { PriorityBadge, StatusBadge } from "@/components/ui/Badge";
 import { EmptyState, Panel, PanelHeader } from "@/components/ui/Panel";
-import { Skeleton } from "@/components/ui/Skeleton";
-import { categoryName } from "@/components/TicketCard";
+import { Skeleton } from "@/components/shadcn/skeleton";
+import { categoryName } from "@/features/tickets/categories";
 import { useSession } from "@/features/auth/useSession";
 import { apiFetch, ApiError } from "@/lib/api";
 import { config } from "@/lib/config";
@@ -81,7 +82,7 @@ export function ReplyScreen({ id }: { id: string }) {
 
   if (detail.isPending) {
     return (
-      <div className="mx-auto max-w-6xl px-4 pb-8 pt-10 sm:px-6" aria-busy="true" aria-label="Loading ticket">
+      <div className="pb-2" aria-busy="true" aria-label="Loading ticket">
         <Skeleton className="h-8 w-64" />
         <Skeleton className="mt-4 h-96 w-full" />
       </div>
@@ -99,9 +100,9 @@ export function ReplyScreen({ id }: { id: string }) {
             title={notFound ? "Ticket not found" : "Couldn't load this ticket"}
             description={notFound ? "It may have been removed, or the link is stale." : "Try again in a moment."}
             action={
-              <LinkButton href="/desk/queue" variant="night">
-                Back to the queue
-              </LinkButton>
+              <Button variant="ghost" asChild>
+                <Link href="/desk/queue">Back to the queue</Link>
+              </Button>
             }
           />
         </Panel>
@@ -135,23 +136,28 @@ export function ReplyScreen({ id }: { id: string }) {
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 pb-8 pt-10 sm:px-6 sm:pt-14">
-      <LinkButton href="/desk/queue" variant="ghost" size="sm" className="-ml-3 mb-6">
-        <ArrowLeft className="size-3.5" aria-hidden /> Back to queue
-      </LinkButton>
+    <div className="flex h-[calc(100dvh-6.5rem)] flex-col overflow-hidden pb-2">
+      <div className="mb-4 shrink-0">
+        <Button variant="ghost" size="sm" className="-ml-3" asChild>
+          <Link href="/desk/queue">
+            <ArrowLeft className="size-3.5" aria-hidden /> Back to queue
+          </Link>
+        </Button>
+      </div>
 
       {ticket.previousRelease && (
-        <div className="mb-4 rounded-[4px] border border-l-2 border-gold-400/30 border-l-gold-400 bg-gold-400/10 p-4" role="status">
+        <div className="mb-4 shrink-0 rounded-[4px] border border-l-2 border-gold-400/30 border-l-gold-400 bg-gold-400/10 p-4" role="status">
           <PreviousReleaseMarker ticket={ticket} />
         </div>
       )}
 
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-        <Panel lit>
+      <div className="grid min-h-0 flex-1 gap-6 overflow-y-auto no-scrollbar lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] lg:overflow-visible">
+        <Panel lit className="lg:flex lg:min-h-0 lg:flex-col lg:overflow-y-auto lg:no-scrollbar">
           <PanelHeader
             eyebrow={ticket.reference}
             title={ticket.title}
             description={`${ticket.requesterName ?? "Employee"} · ${categoryName(ticket.categoryId)} · Submitted ${formatDateTime(ticket.createdAt)}`}
+            className="lg:sticky lg:top-0 lg:z-10 lg:rounded-t-[4px] lg:bg-white"
             action={
               <div className="flex flex-wrap items-center gap-2">
                 <StatusBadge status={ticket.status} />
@@ -193,7 +199,8 @@ export function ReplyScreen({ id }: { id: string }) {
           </div>
         </Panel>
 
-        <Panel tone="night" lit className="p-6 lg:sticky lg:top-24">
+        <div className="min-h-0 lg:overflow-y-auto lg:no-scrollbar">
+        <Panel tone="night" lit className="p-6">
           <p className="eyebrow mb-2">Work this ticket</p>
           {conflict && (
             <p role="alert" className="mb-3 rounded-[2px] bg-gold-400/10 px-3 py-2 text-[13px] text-gold-400">
@@ -234,10 +241,13 @@ export function ReplyScreen({ id }: { id: string }) {
                 }}
                 onLocked={(owner) => setLockedOwner(owner)}
               />
-              <div className="flex flex-wrap gap-2 border-t border-cream/10 pt-4">
-                {unassigned && <ClaimButton ticket={ticket} />}
-                {!unassigned && (!lockedByOther || role === "admin") && <ReleaseDialog ticket={ticket} />}
+              {/* Same card-action pattern as QueueRow: all actions docked right. */}
+              <div className="flex flex-wrap items-center justify-end gap-2 border-t border-cream/10 pt-4">
+                {unassigned && role !== "admin" && <ClaimButton ticket={ticket} />}
                 {role === "admin" && <AssignDialog ticket={ticket} agents={agents} />}
+                {!unassigned && (!lockedByOther || role === "admin") && (
+                  <ReleaseDialog ticket={ticket} />
+                )}
               </div>
             </div>
           )}
@@ -245,6 +255,7 @@ export function ReplyScreen({ id }: { id: string }) {
             Updated {formatRelative(ticket.updatedAt)} · version {ticket.version}
           </p>
         </Panel>
+        </div>
       </div>
     </div>
   );

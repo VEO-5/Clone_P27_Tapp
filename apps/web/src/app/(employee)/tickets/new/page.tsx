@@ -1,4 +1,4 @@
-import { TicketForm } from "@/components/TicketForm";
+import { TicketForm } from "@/features/tickets/TicketForm";
 
 export const metadata = { title: "Report an issue" };
 

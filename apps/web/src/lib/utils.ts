@@ -52,6 +52,11 @@ export function initials(name: string): string {
     .join("");
 }
 
+/** Derived company email for a requester name (mock data carries names only). */
+export function requesterEmail(name: string): string {
+  return `${name.trim().toLowerCase().replace(/\s+/g, ".")}@pearl27.com`;
+}
+
 export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;

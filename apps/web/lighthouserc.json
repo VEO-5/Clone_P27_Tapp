@@ -1,0 +1,33 @@
+{
+  "ci": {
+    "collect": {
+      "startServerCommand": "pnpm --filter @pearl27/web start",
+      "url": [
+        "http://localhost:3000/",
+        "http://localhost:3000/tickets",
+        "http://localhost:3000/desk",
+        "http://localhost:3000/desk/tickets/TK-1042",
+        "http://localhost:3000/sign-in",
+        "http://localhost:3000/admin",
+        "http://localhost:3000/admin/settings"
+      ]
+    },
+    "assert": {
+      "assertions": {
+        "categories:performance": ["error", { "minScore": 0.9 }],
+        "categories:accessibility": ["error", { "minScore": 1 }],
+        "categories:best-practices": ["error", { "minScore": 1 }],
+        "categories:seo": ["error", { "minScore": 1 }],
+        "cumulative-layout-shift": ["error", { "maxNumericValue": 0.1 }],
+        "first-contentful-paint": ["error", { "maxNumericValue": 1800 }],
+        "largest-contentful-paint": ["error", { "maxNumericValue": 2500 }],
+        "total-blocking-time": ["error", { "maxNumericValue": 300 }],
+        "speed-index": ["error", { "maxNumericValue": 3400 }],
+        "max-total-size": ["error", { "maxValue": 4000000, "strategy": "pessimistic" }]
+      }
+    },
+    "upload": {
+      "target": "temporary-public-storage"
+    }
+  }
+}

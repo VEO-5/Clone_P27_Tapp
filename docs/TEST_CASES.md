@@ -94,9 +94,13 @@ Each employee has a persistent page at `/my-tickets`. They sign in with the work
 | ID | Case | Steps | Expected |
 |----|------|-------|----------|
 | A1 | Auth gate | Visit `/admin` while signed out | Redirected to `/admin/login` |
-| A2 | Wrong access code | Submit a bad code | "Invalid access code" error, no cookie set |
-| A3 | Correct access code | Submit the configured code | Session cookie (HttpOnly, SameSite=Lax) set; dashboard loads |
+| A2 | Wrong domain | Submit `someone@gmail.com` | "Use your @pearl27.com work email" error, no session created |
+| A3 | Email sign-in | Submit an invited agent/admin work email | Session set; dashboard loads with that role's home |
+| A3b | Invite → sign-in loop | Admin invites `new.agent@pearl27.com`, sign out, sign in with it | Lands with agent powers |
+| A3c | Unknown company email | Submit `stranger@pearl27.com` | Signed in as employee only — never elevated |
+| A3d | Deactivation demotes | Admin deactivates an agent, agent signs in again | Lands on employee My tickets with a demotion notice; history intact |
 | A4 | API protection | `GET /api/admin/tickets` with no cookie | `401 Unauthorized` |
+| A4b | Role protection | Employee session calls a desk/admin endpoint | `403 Forbidden` |
 | A5 | KPI cards | Dashboard with mixed tickets | Open / In progress / Resolved / Total counts match the table |
 | A6 | Search | Type part of a name, email, title, or reference | Table filters to matching rows |
 | A7 | Status filter | Filter to "In progress" | Only in-progress tickets listed; filter reflected in the URL |

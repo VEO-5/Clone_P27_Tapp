@@ -1,6 +1,8 @@
 "use client";
 
-import { LinkButton } from "@/components/ui/Button";
+import Link from "next/link";
+
+import { Button } from "@/components/shadcn/button";
 import { EmptyState, Panel } from "@/components/ui/Panel";
 
 export default function AppError({
@@ -18,16 +20,12 @@ export default function AppError({
           description="Try again. If this keeps happening, contact System Support."
           action={
             <div className="flex flex-col gap-2 sm:flex-row">
-              <button
-                type="button"
-                onClick={reset}
-                className="inline-flex h-11 items-center justify-center rounded-[2px] bg-iris-500 px-7 text-sm font-medium text-white"
-              >
+              <Button type="button" onClick={reset}>
                 Try again
-              </button>
-              <LinkButton href="/" variant="night">
-                Back home
-              </LinkButton>
+              </Button>
+              <Button variant="ghost" asChild>
+                <Link href="/">Back home</Link>
+              </Button>
             </div>
           }
         />

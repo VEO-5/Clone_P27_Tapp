@@ -10,40 +10,43 @@
 | P3 | UI: submit form + confirmation, tracking pages, admin dashboard | 30–50 min |
 | P4 | Wire env, smoke test, git commits, deploy to Vercel, walkthrough notes | 50–60 min |
 
-## Architecture
+## Architecture (current: `apps/web`, Next.js 16)
 
 ```
-frontend/                        # Next.js 15 app — UI + Node backend (route handlers)
-  src/
-    app/
-      page.tsx                   # Submit ticket (hero + form + confirmation state)
-      track/page.tsx             # Lookup by reference or email
-      track/[ref]/page.tsx       # Ticket detail + timeline
-      admin/page.tsx             # Login or dashboard (cookie-gated)
-      admin/tickets/[id]/page.tsx# Admin ticket detail
-      api/
-        tickets/route.ts         # POST create (multipart), GET ?email= / ?ref=
-        tickets/[ref]/route.ts   # GET one ticket + events + signed attachment URLs
-        admin/login/route.ts     # POST access code -> HTTP-only cookie
-        admin/logout/route.ts    # POST clear cookie
-        admin/tickets/route.ts   # GET all (filters) [auth]
-        admin/tickets/[id]/route.ts # PATCH status/priority/reply [auth]
-    lib/
-      supabase.ts                # service-role client (server only)
-      email.ts                   # Resend wrapper, no-op without key
-      validation.ts              # input validation helpers
-      adminAuth.ts               # cookie session sign/verify (HMAC)
-      types.ts                   # shared domain types
-    components/                  # TicketForm, UploadZone, StatusBadge, Timeline, ...
-supabase/schema.sql              # tables, indexes, RLS, storage bucket
+apps/web/src/                  # Next.js 16 App Router + React 19 — UI + API routes
+  app/
+    (employee)/tickets/        # submit form, my-tickets, ticket detail
+    (desk)/desk/               # agent queue, kanban, ticket reply, admin
+    (public)/sign-in           # mock sign-in, access denied
+    layout.tsx                 # AppShell + SessionHeader (components/layout)
+  features/                    # domain-owned UI (imports flow one way ↓)
+    tickets/                   # TicketForm, TicketCard, TicketConfirmation,
+                               # UploadZone, AttachmentList, StatusTimeline,
+                               # categories.ts, uploads.ts
+    desk/                      # queue, kanban, composer, AdminTicketActions
+    admin/ auth/               # management tables, session hooks/gates
+  components/
+    layout/                    # AppShell, SiteHeader/Footer, SessionHeader
+    ui/                        # brand system: Badge, Panel, Form, Timeline
+    shadcn/                    # vendored Radix primitives (do not hand-edit)
+  lib/                         # cross-cutting: api, auth, config, utils
+                               # contracts (@pearl27/contracts) is source of
+                               # truth; lib/types is a legacy shim
+packages/contracts + api-client# shared Zod schemas + typed fetch client
+supabase/schema.sql            # tables, indexes, RLS, storage bucket
 docs/ PRD.md · PLAN.md · TEST_CASES.md · WALKTHROUGH.md
 ```
+
+Import rule: `features/*` → `components/ui|layout + lib + packages/*`.
+Never `components/*` → `features/*` (except session hooks passed via props
+where already established). No `features/*` barrels — use deep imports
+(`@/features/tickets/TicketCard`) to avoid cycles and RSC bloat.
 
 ## Key flows
 
 1. **Create ticket:** browser POSTs `multipart/form-data` → route handler validates → inserts `tickets` row + `created` event → uploads files to private `attachments` bucket → sends confirmation email → returns reference → UI shows confirmation state.
 2. **Track:** GET by reference (exact) or email (list). Detail page renders status, timeline, signed URLs (60-min expiry) for attachments.
-3. **Admin:** login sets HMAC-signed cookie → dashboard fetches via authed routes → PATCH status writes `status_changed` event, stamps `resolved_at`, fires resolution email.
+3. **Admin:** sign in with an invited work email → session cookie → dashboard fetches via role-gated routes → PATCH status writes `status_changed` event, stamps `resolved_at`, fires resolution email. Deactivation demotes to employee; unknown addresses can only ever be employees.
 
 ## Risk log
 

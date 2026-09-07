@@ -1,6 +1,6 @@
 import type { TicketEvent } from "@pearl27/contracts";
 
-import { Timeline } from "@/components/Timeline";
+import { Timeline } from "@/components/ui/Timeline";
 import type { TicketEvent as LegacyEvent } from "@/lib/types";
 
 const STATUS_TYPES = new Set(["created", "status_changed", "reopened", "resolved"]);

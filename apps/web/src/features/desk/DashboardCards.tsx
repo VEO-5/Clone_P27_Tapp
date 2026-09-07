@@ -32,7 +32,7 @@ export function DashboardCards({ cards }: { cards: DeskDashboardCards }) {
           <span className="mt-2 block font-display text-2xl text-cream sm:text-3xl">
             {Number(cards[key] ?? 0)}
           </span>
-          <span className="mt-1 block text-[12px] text-haze">{hint}</span>
+          <span className="mt-1 block text-[12px] text-haze">{cards.trends?.[key] ?? hint}</span>
         </Link>
       ))}
     </div>

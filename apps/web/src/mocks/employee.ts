@@ -176,8 +176,10 @@ export function resetEmployeeStore() {
   presigned.clear();
 }
 
-export function listEmployeeTickets(): EmployeeTicketDetail[] {
-  return [...store].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+export function listEmployeeTickets(viewerId = "u-employee-1"): EmployeeTicketDetail[] {
+  return store
+    .filter((t) => t.requesterId === viewerId)
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
 export function getEmployeeTicketByReference(reference: string): EmployeeTicketDetail | null {
@@ -188,12 +190,15 @@ export function getEmployeeTicketById(id: string): EmployeeTicketDetail | null {
   return store.find((t) => t.id === id) ?? null;
 }
 
-export function addEmployeeTicket(input: {
-  title: string;
-  description: string;
-  categoryId: string;
-  priority: Ticket["priority"];
-}): EmployeeTicketDetail {
+export function addEmployeeTicket(
+  input: {
+    title: string;
+    description: string;
+    categoryId: string;
+    priority: Ticket["priority"];
+  },
+  requesterId = "u-employee-1",
+): EmployeeTicketDetail {
   const ticket: EmployeeTicketDetail = {
     id: `t-emp-${Date.now()}`,
     reference: nextReference(),
@@ -202,7 +207,7 @@ export function addEmployeeTicket(input: {
     categoryId: input.categoryId,
     status: "pending",
     priority: input.priority,
-    requesterId: "u-employee-1",
+    requesterId,
     assigneeId: null,
     handlingAgent: null,
     chatDmUrl: `https://chat.google.com/mock-${Date.now()}`,
@@ -220,9 +225,10 @@ export function addEmployeeTicket(input: {
   return ticket;
 }
 
-export function employeeCounts(): { pending: number; open: number; inProgress: number; resolved: number } {
+export function employeeCounts(viewerId = "u-employee-1"): { pending: number; open: number; inProgress: number; resolved: number } {
   const counts = { pending: 0, open: 0, inProgress: 0, resolved: 0 };
   for (const t of store) {
+    if (t.requesterId !== viewerId) continue;
     if (t.status === "pending") counts.pending += 1;
     else if (t.status === "open") counts.open += 1;
     else if (t.status === "in_progress") counts.inProgress += 1;
@@ -232,9 +238,10 @@ export function employeeCounts(): { pending: number; open: number; inProgress: n
 }
 
 /** Latest status updates across my tickets (status events only, newest first). */
-export function employeeUpdates(limit = 5) {
+export function employeeUpdates(limit = 5, viewerId = "u-employee-1") {
   const updates: { ticketId: string; reference: string; title: string; message: string; createdAt: string }[] = [];
   for (const t of store) {
+    if (t.requesterId !== viewerId) continue;
     for (const e of t.events) {
       if (e.type === "status_changed" || e.type === "resolved" || e.type === "reopened") {
         updates.push({
@@ -250,19 +257,20 @@ export function employeeUpdates(limit = 5) {
   return updates.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, limit);
 }
 
-export function unratedResolvedTickets(withinDays = 7): EmployeeTicketDetail[] {
+export function unratedResolvedTickets(withinDays = 7, viewerId = "u-employee-1"): EmployeeTicketDetail[] {
   const cutoff = NOW - withinDays * 24 * HOURS;
   return store.filter(
     (t) =>
+      t.requesterId === viewerId &&
       t.status === "resolved" &&
       !ratedTickets.has(t.id) &&
       new Date(t.updatedAt).getTime() >= cutoff,
   );
 }
 
-export function rateTicket(id: string, score: number, comment?: string): boolean {
+export function rateTicket(id: string, score: number, comment?: string, viewerId = "u-employee-1"): boolean {
   const ticket = getEmployeeTicketById(id);
-  if (!ticket || ticket.status !== "resolved") return false;
+  if (!ticket || ticket.requesterId !== viewerId || ticket.status !== "resolved") return false;
   if (!Number.isInteger(score) || score < 1 || score > 5) return false;
   if (comment !== undefined && comment.trim().length > 1000) return false;
   ratedTickets.add(id);
