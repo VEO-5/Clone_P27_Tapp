@@ -45,14 +45,20 @@ export function TicketForm() {
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{ ticket: Ticket; uploads: UploadState[] } | null>(null);
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const [categoriesError, setCategoriesError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     apiFetch<{ id: string; name: string }[]>("/categories")
       .then((list) => {
-        if (!cancelled) setCategories(list);
+        if (!cancelled) {
+          setCategories(list);
+          setCategoriesError(null);
+        }
       })
-      .catch(() => undefined);
+      .catch(() => {
+        if (!cancelled) setCategoriesError("Couldn't load categories. Check your connection and try again.");
+      });
     return () => {
       cancelled = true;
     };
@@ -102,11 +108,16 @@ export function TicketForm() {
         method: "POST",
         body: JSON.stringify({ fileName: file.name, mimeType: file.type, sizeBytes: file.size }),
       });
-      await uploadFileWithProgress(presigned.uploadUrl, file, onProgress);
+      await uploadFileWithProgress(presigned.uploadUrl, file, onProgress, presigned.headers ?? {});
       await apiFetch(`/tickets/${ticketId}/attachments/${presigned.attachmentId}/complete`, { method: "POST" });
       return { ...base, status: "done", progress: 100 };
-    } catch {
-      return { ...base, status: "error", progress: 0 };
+    } catch (error) {
+      return {
+        ...base,
+        status: "error",
+        progress: 0,
+        message: error instanceof Error ? error.message : "Upload failed — check your connection and retry.",
+      };
     }
   }
 
@@ -175,6 +186,9 @@ export function TicketForm() {
       if (Object.keys(fieldErrors).length > 0) {
         setErrors(fieldErrors);
         focusFirstError(fieldErrors);
+      } else if (error instanceof TypeError || (error instanceof Error && /failed to fetch|network/i.test(error.message))) {
+        setFormError("Couldn't reach support — check your connection and try again.");
+        formRef.current?.querySelector<HTMLElement>('[data-form-error]')?.focus();
       } else {
         setFormError(error instanceof Error ? error.message : "We couldn't submit your ticket. Please try again.");
       }
@@ -185,6 +199,8 @@ export function TicketForm() {
 
   async function retryUpload(index: number) {
     if (!result) return;
+    const current = result.uploads[index];
+    if (!current || current.status === "uploading") return;
     const file = files[index];
     if (!file) return;
     setResult((current) => {
@@ -248,6 +264,8 @@ export function TicketForm() {
                 id="categoryId"
                 name="categoryId"
                 value={values.categoryId}
+                invalid={Boolean(errors.categoryId)}
+                aria-describedby={errors.categoryId ? "categoryId-error" : undefined}
                 onChange={(event) => set("categoryId", event.target.value)}
               >
                 <option value="">Choose a category</option>
@@ -257,13 +275,32 @@ export function TicketForm() {
                   </option>
                 ))}
               </Select>
+              {categoriesError && (
+                <p className="text-[12.5px] text-amber-300" role="alert">
+                  {categoriesError}{" "}
+                  <button
+                    type="button"
+                    className="underline underline-offset-2"
+                    onClick={() => {
+                      setCategoriesError(null);
+                      apiFetch<{ id: string; name: string }[]>("/categories")
+                        .then(setCategories)
+                        .catch(() => setCategoriesError("Couldn't load categories. Check your connection and try again."));
+                    }}
+                  >
+                    Retry
+                  </button>
+                </p>
+              )}
             </Field>
 
-            <Field htmlFor="priority" label="How urgent is it?">
+            <Field htmlFor="priority" label="How urgent is it?" error={errors.priority}>
               <Select
                 id="priority"
                 name="priority"
                 value={values.priority}
+                invalid={Boolean(errors.priority)}
+                aria-describedby={errors.priority ? "priority-error" : undefined}
                 onChange={(event) => set("priority", event.target.value as FormValues["priority"])}
               >
                 {(Object.keys(PRIORITY_LABELS) as (keyof typeof PRIORITY_LABELS)[]).map((priority) => (
@@ -301,7 +338,7 @@ export function TicketForm() {
         <div className="flex flex-col gap-4 border-t border-ink-700/70 px-6 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8">
           <div aria-live="assertive" className="min-h-5 flex-1">
             {formError && (
-              <p className="flex items-start gap-2 text-[13px] text-rose-400">
+              <p data-form-error tabIndex={-1} className="flex items-start gap-2 text-[13px] text-rose-400 outline-none focus-visible:ring-2 focus-visible:ring-rose-400/60">
                 <AlertTriangle className="mt-px size-4 shrink-0" aria-hidden />
                 {formError}
               </p>

@@ -14,6 +14,7 @@ export interface UploadState {
   fileName: string;
   status: "uploading" | "done" | "error";
   progress: number;
+  message?: string;
 }
 
 /**
@@ -92,7 +93,7 @@ export function TicketConfirmation({
                     )}
                     {upload.status === "error" && (
                       <span className="mt-0.5 block text-[12.5px] text-rose-400">
-                        Upload failed — your ticket is saved.
+                        {upload.message ?? "Upload failed — your ticket is saved."}
                       </span>
                     )}
                   </span>

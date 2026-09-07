@@ -2,10 +2,16 @@
  * Client-safe config for apps/web.
  * UI-only: the web app holds no secrets. Only public env is exposed.
  *
- * Mock strategy (stays until real backend lands):
- * - Local / preview: NEXT_PUBLIC_API_MOCK=true → MSW worker serves demo data.
- * - Real backend day: set NEXT_PUBLIC_API_MOCK=false + NEXT_PUBLIC_API_URL=https://api…
- *   No code change needed — apiFetch + MockProvider already branch on this flag.
+ * Backend handoff (frontend complete):
+ * - Local / preview with no backend: NEXT_PUBLIC_API_MOCK=true → MSW worker
+ *   serves reference data from src/mocks (mirror of the prod contract).
+ * - Production with real backend: set NEXT_PUBLIC_API_MOCK=false +
+ *   NEXT_PUBLIC_API_URL=https://… — MockProvider never imports src/mocks,
+ *   so no mock code ships to prod. No code change needed.
+ * - src/mocks/handlers.ts is the working API spec until the backend returns
+ *   200s; delete it only after backend parity. Mock-only routes
+ *   (/mock-session, /mock-invites/restore, /mock-reset, /mock-uploads,
+ *   /mock-files) must NEVER be reimplemented in prod.
  */
 export const config = {
   get apiUrl(): string {
