@@ -35,6 +35,7 @@ import {
   deskAgents,
   deskDashboard,
   listDeskTickets,
+  listOwnershipAudit,
   queryDeskTickets,
   releaseTicket,
 } from "./desk";
@@ -384,8 +385,14 @@ export const handlers = [
     try {
       const result = claimTicket(String(params.id));
       if (!result.ok) {
+        if (result.error.code === "RESOLVED") {
+          return HttpResponse.json(
+            { error: { code: "RESOLVED", message: "This ticket is resolved. Change status to reopen it." } },
+            { status: 422 },
+          );
+        }
         return HttpResponse.json(
-          { error: { code: "ALREADY_ASSIGNED", message: `Already taken by ${result.assignee.name}`, assignee: result.assignee } },
+          { error: { code: "ALREADY_ASSIGNED", message: `Already taken by ${result.error.assignee.name}`, assignee: result.error.assignee } },
           { status: 409 },
         );
       }
@@ -401,24 +408,67 @@ export const handlers = [
     const g = gate("agent");
     if (g.response) return g.response;
     const body = (await request.json().catch(() => ({}))) as { reason?: string };
-    const ticket = releaseTicket(String(params.id), body.reason);
+    const ticket = releaseTicket(String(params.id), body.reason, {
+      id: g.profile.id,
+      name: g.profile.name,
+      role: g.profile.role,
+    });
     if (!ticket) {
       return HttpResponse.json(
         { error: { code: "NOT_FOUND", message: "Ticket not found." } },
         { status: 404 },
       );
     }
+    if ("error" in ticket) {
+      const code = ticket.error.code;
+      if (code === "FORBIDDEN") {
+        return HttpResponse.json(
+          { error: { code: "FORBIDDEN", message: `Locked to ${ticket.error.ownerName} · view only` } },
+          { status: 403 },
+        );
+      }
+      if (code === "RESOLVED") {
+        return HttpResponse.json(
+          { error: { code: "RESOLVED", message: "This ticket is resolved. Change status to reopen it." } },
+          { status: 422 },
+        );
+      }
+      if (code === "REASON_TOO_LONG") {
+        return HttpResponse.json(
+          { error: { code: "VALIDATION_FAILED", message: "Keep the reason under 500 characters.", fieldErrors: { reason: "Keep it under 500 characters" } } },
+          { status: 422 },
+        );
+      }
+      return HttpResponse.json(
+        { error: { code: "VALIDATION_FAILED", message: "There's nothing to release — this ticket is unassigned." } },
+        { status: 422 },
+      );
+    }
     return HttpResponse.json(ticket);
   }),
   http.post(`${API}/desk/tickets/:id/assign`, async ({ params, request }) => {
-    const g = gate("agent");
+    // Admin-only: agents self-serve via claim, they never assign to others.
+    const g = gate("admin");
     if (g.response) return g.response;
     const body = (await request.json().catch(() => ({}))) as { assigneeId?: string };
-    const ticket = assignTicket(String(params.id), String(body.assigneeId ?? ""));
+    const assigneeId = String(body.assigneeId ?? "").trim();
+    if (!assigneeId) {
+      return HttpResponse.json(
+        { error: { code: "VALIDATION_FAILED", message: "Pick an agent.", fieldErrors: { assigneeId: "Choose an agent" } } },
+        { status: 422 },
+      );
+    }
+    const ticket = assignTicket(String(params.id), assigneeId, { id: g.profile.id, name: g.profile.name });
     if (!ticket) {
       return HttpResponse.json(
         { error: { code: "NOT_FOUND", message: "Ticket or agent not found." } },
         { status: 404 },
+      );
+    }
+    if ("error" in ticket) {
+      return HttpResponse.json(
+        { error: { code: "RESOLVED", message: "This ticket is resolved. Change status to reopen it." } },
+        { status: 422 },
       );
     }
     return HttpResponse.json(ticket);
@@ -592,9 +642,24 @@ export const handlers = [
     const g = gate("admin");
     if (g.response) return g.response;
     const url = new URL(request.url);
-    return HttpResponse.json(
-      auditItems(url.searchParams.get("cursor") ?? undefined, Number(url.searchParams.get("limit") ?? 15)),
-    );
+    // Live ownership trail first (claim/release/assign this session), then
+    // the synthetic backlog — so admin audit reflects what just happened.
+    const live = listOwnershipAudit().map((entry) => ({
+      id: `audit-live-${entry.id}`,
+      actor: entry.actorName,
+      action:
+        entry.action === "ticket.claimed"
+          ? ("ticket.assigned" as const)
+          : entry.action === "ticket.released"
+            ? ("ticket.released" as const)
+            : ("ticket.assigned" as const),
+      entity: `ticket:${entry.reference}`,
+      summary: `${entry.action} ${entry.reference}${entry.reason ? ` — ${entry.reason}` : ""}`,
+      createdAt: entry.createdAt,
+      diff: { assignee: { before: entry.beforeAssigneeId, after: entry.afterAssigneeId } },
+    }));
+    const page = auditItems(url.searchParams.get("cursor") ?? undefined, Number(url.searchParams.get("limit") ?? 15));
+    return HttpResponse.json({ items: [...live, ...page.items].slice(0, Number(url.searchParams.get("limit") ?? 15)), nextCursor: page.nextCursor });
   }),
   http.get(`${API}/admin/settings`, () => {
     const g = gate("admin");

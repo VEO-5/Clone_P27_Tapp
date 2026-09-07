@@ -10,6 +10,8 @@ import { Button } from "@/components/shadcn/button";
 import { ApiError, apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
+import { invalidateDesk } from "./ownership";
+
 /** Pessimistic claim: 409 names the winner and refreshes the row (FE-3.7). */
 export function ClaimButton({ ticket, compact = false, className }: { ticket: DeskTicket; compact?: boolean; className?: string }) {
   const queryClient = useQueryClient();
@@ -20,14 +22,17 @@ export function ClaimButton({ ticket, compact = false, className }: { ticket: De
     setClaiming(true);
     try {
       await apiFetch(`/desk/tickets/${ticket.id}/claim`, { method: "POST" });
-      await queryClient.invalidateQueries({ queryKey: ["desk", "tickets"] });
+      await invalidateDesk(queryClient);
       toast.success("Assigned to you");
     } catch (error) {
       if (error instanceof ApiError && error.code === "ALREADY_ASSIGNED") {
         const assignee = error.details?.assignee as { name?: string } | undefined;
         const name = assignee?.name ?? parseAssignee(error.message);
         toast.error(`Already taken by ${name}`);
-        await queryClient.invalidateQueries({ queryKey: ["desk", "tickets"] });
+        await invalidateDesk(queryClient);
+      } else if (error instanceof ApiError && (error.code === "RESOLVED" || error.code === "FORBIDDEN")) {
+        toast.error(error.message);
+        await invalidateDesk(queryClient);
       } else {
         toast.error(error instanceof Error ? error.message : "Couldn't assign this ticket.");
       }

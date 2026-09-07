@@ -24,6 +24,7 @@ import { ClaimButton } from "./ClaimButton";
 import { Composer, type SendOutcome } from "./Composer";
 import { ConversationStream, PresenceBar } from "./ConversationStream";
 import { AssignDialog, ReleaseDialog } from "./OwnershipDialogs";
+import { invalidateDesk, ownershipRules } from "./ownership";
 import { PreviousReleaseMarker, SlaBadge } from "./RowBadges";
 
 interface Detail {
@@ -112,13 +113,15 @@ export function ReplyScreen({ id }: { id: string }) {
 
   const { ticket, events, messages, attachments } = detail.data;
   const role = session.data?.role === "admin" ? "admin" : "agent";
-  const lockedByOther = ticket.lock?.lockedByOther ?? false;
+  const { lockedByOther, canClaim, canRelease, canAssign, isTerminal, mine } = ownershipRules(ticket, role);
   // Agents see a read-only banner on others' tickets; admins always work.
-  const readOnly = lockedByOther && role === "agent";
+  // Resolved is terminal for everyone: read-only until status reopens.
+  const readOnly = (lockedByOther && role === "agent") || isTerminal;
   const showComposer = !readOnly;
   const lockOwner = lockedByOther ? (ticket.lock?.ownerName ?? "another agent") : null;
-  const effectiveLockedOwner = lockedOwner ?? (readOnly ? lockOwner : null);
+  const effectiveLockedOwner = isTerminal ? null : (lockedOwner ?? (readOnly ? lockOwner : null));
   const unassigned = !ticket.assignee;
+  const pendingNotOpened = !isTerminal && ticket.status === "pending" && mine;
   const agents = agentsQuery.data ?? [];
   const viewers = presence?.ticketId === id ? presence.viewers : [];
   const me = session.data?.name ?? "";
@@ -132,7 +135,7 @@ export function ReplyScreen({ id }: { id: string }) {
       justOpened: false,
     });
     setConflict(false);
-    void queryClient.invalidateQueries({ queryKey: ["desk", "tickets"] });
+    void invalidateDesk(queryClient);
   }
 
   return (
@@ -181,7 +184,7 @@ export function ReplyScreen({ id }: { id: string }) {
 
             <section>
               <p className="eyebrow mb-3">Description</p>
-              <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-pearl-dim">{ticket.description}</p>
+              <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-pearl-dim break-words">{ticket.description}</p>
             </section>
 
             <section>
@@ -202,6 +205,16 @@ export function ReplyScreen({ id }: { id: string }) {
         <div className="min-h-0 lg:overflow-y-auto lg:no-scrollbar">
         <Panel tone="night" lit className="p-6">
           <p className="eyebrow mb-2">Work this ticket</p>
+          {isTerminal && (
+            <p className="mb-3 rounded-[2px] bg-emerald-400/10 px-3 py-2 text-[13px] text-emerald-300" role="status">
+              Resolved — read only. Change status to Open to rework it.
+            </p>
+          )}
+          {pendingNotOpened && (
+            <p className="mb-3 rounded-[2px] bg-gold-400/10 px-3 py-2 text-[13px] text-gold-300" role="status">
+              Assigned to you · Pending — opening this ticket marks it Open.
+            </p>
+          )}
           {conflict && (
             <p role="alert" className="mb-3 rounded-[2px] bg-gold-400/10 px-3 py-2 text-[13px] text-gold-400">
               This ticket changed while you were typing — review the latest and send again. Your draft is kept.
@@ -241,13 +254,12 @@ export function ReplyScreen({ id }: { id: string }) {
                 }}
                 onLocked={(owner) => setLockedOwner(owner)}
               />
-              {/* Same card-action pattern as QueueRow: all actions docked right. */}
+              {/* Same card-action pattern as QueueRow: all actions docked right.
+                  Resolved never acts; pending/open/in_progress follow the hook. */}
               <div className="flex flex-wrap items-center justify-end gap-2 border-t border-cream/10 pt-4">
-                {unassigned && role !== "admin" && <ClaimButton ticket={ticket} />}
-                {role === "admin" && <AssignDialog ticket={ticket} agents={agents} />}
-                {!unassigned && (!lockedByOther || role === "admin") && (
-                  <ReleaseDialog ticket={ticket} />
-                )}
+                {canClaim && <ClaimButton ticket={ticket} />}
+                {canAssign && <AssignDialog ticket={ticket} agents={agents} />}
+                {canRelease && <ReleaseDialog ticket={ticket} />}
               </div>
             </div>
           )}

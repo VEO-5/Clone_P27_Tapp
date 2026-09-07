@@ -10,6 +10,7 @@ import { formatRelative, requesterEmail } from "@/lib/utils";
 
 import { ClaimButton } from "./ClaimButton";
 import { AssignDialog, ReleaseDialog } from "./OwnershipDialogs";
+import { ownershipHint, ownershipLabel, useOwnership } from "./ownership";
 import { LockBadge, PreviousReleaseMarker, SlaBadge } from "./RowBadges";
 
 /**
@@ -32,13 +33,9 @@ export function QueueRow({
   onFocusIndex?: (index: number) => void;
   index?: number;
 }) {
-  const lockedByOther = ticket.lock?.lockedByOther ?? false;
-  const unassigned = !ticket.assignee;
-  // Agents self-assign; admins assign to agents instead (no self-claim).
-  const canClaim = role !== "admin" && unassigned && !lockedByOther;
-  const canRelease = !unassigned && (!lockedByOther || role === "admin");
-  const canAssign = role === "admin" && !lockedByOther;
+  const { canClaim, canRelease, canAssign, isTerminal } = useOwnership(ticket, role);
   const requester = ticket.requesterName ?? "Employee";
+  const hint = ownershipHint(ticket);
 
   return (
     <article
@@ -85,25 +82,23 @@ export function QueueRow({
       <p className="mt-0.5 text-xs text-fog">{categoryName(ticket.categoryId)}</p>
 
       {/* Description */}
-      <p className="mt-2 line-clamp-2 text-[13px] leading-relaxed text-mist">{ticket.description}</p>
+      <p className="mt-2 line-clamp-2 text-[13px] leading-relaxed text-mist break-words">{ticket.description}</p>
 
-      {/* Metadata: status + priority, then ownership / SLA */}
+      {/* Metadata: status + priority, then ownership / SLA. Status and owner
+          always pair so Pending/Unassigned vs Pending/Mine read differently. */}
       <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1.5">
         <StatusBadge status={ticket.status} size="sm" />
         <PriorityBadge priority={ticket.priority} size="sm" />
-        <span className="text-xs text-fog">
-          {ticket.assignee ? (
-            <>Assigned to {lockedByOther ? ticket.assignee.name : "me"}</>
-          ) : (
-            "Unassigned"
-          )}
+        <span className="text-xs text-fog" title={hint ?? undefined}>
+          {ownershipLabel(ticket)}
+          {hint ? ` · ${hint}` : ""}
         </span>
         <LockBadge ticket={ticket} />
         <SlaBadge ticket={ticket} />
       </div>
 
-      {/* Action: assignment state drives the button */}
-      {(canClaim || canRelease || canAssign) && (
+      {/* Action: assignment state drives the button. Resolved never acts. */}
+      {!isTerminal && (canClaim || canRelease || canAssign) && (
         <div className="mt-3 flex flex-wrap items-center gap-2">
           {canClaim && (
             <span data-action="claim" className="contents">

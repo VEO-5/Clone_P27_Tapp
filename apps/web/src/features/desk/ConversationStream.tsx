@@ -113,7 +113,7 @@ export function ConversationStream({ messages, events }: { messages: Message[]; 
                   <span aria-hidden>·</span>
                   <span>{mine ? (item.delivered ? "delivered" : "sent") : formatDateTime(item.createdAt)}</span>
                 </p>
-                <p className="mt-1 whitespace-pre-wrap text-[14px] leading-relaxed">{item.text}</p>
+                <p className="mt-1 whitespace-pre-wrap text-[14px] leading-relaxed break-words">{item.text}</p>
               </div>
             </div>
           );

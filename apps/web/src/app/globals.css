@@ -298,6 +298,30 @@
   }
 }
 
+/* Slim scrollbar for data-table frames: transparent track with a faint
+   thumb always visible so users can see scroll position at a glance,
+   full-strength on hover (same ink language as the DeskShell column). */
+@utility slim-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--color-ink-600) 45%, transparent) transparent;
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--color-ink-600) 45%, transparent);
+  }
+  &:hover {
+    scrollbar-color: var(--color-ink-600) transparent;
+    &::-webkit-scrollbar-thumb {
+      background: var(--color-ink-600);
+    }
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

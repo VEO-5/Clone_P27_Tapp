@@ -18,7 +18,9 @@ import { Input } from "@/components/shadcn/input";
 import { Label } from "@/components/shadcn/label";
 import { apiFetch, ApiError } from "@/lib/api";
 
-/** Release to unassigned — reason optional (FE-3.8). Assignee or admin only. */
+import { invalidateDesk } from "./ownership";
+
+/** Release to unassigned — reason optional (FE-3.8). Owner or admin only. Never on resolved. */
 export function ReleaseDialog({ ticket }: { ticket: DeskTicket }) {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -27,13 +29,18 @@ export function ReleaseDialog({ ticket }: { ticket: DeskTicket }) {
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
+    const clean = reason.trim();
+    if (clean.length > 500) {
+      toast.error("Keep the reason under 500 characters.");
+      return;
+    }
     setSaving(true);
     try {
       await apiFetch(`/desk/tickets/${ticket.id}/release`, {
         method: "POST",
-        body: JSON.stringify({ reason: reason.trim() || undefined }),
+        body: JSON.stringify({ reason: clean || undefined }),
       });
-      await queryClient.invalidateQueries({ queryKey: ["desk", "tickets"] });
+      await invalidateDesk(queryClient);
       toast.success("Released to unassigned");
       setOpen(false);
       setReason("");
@@ -100,7 +107,7 @@ export function AssignDialog({ ticket, agents }: { ticket: DeskTicket; agents: A
         method: "POST",
         body: JSON.stringify({ assigneeId }),
       });
-      await queryClient.invalidateQueries({ queryKey: ["desk", "tickets"] });
+      await invalidateDesk(queryClient);
       toast.success("Ticket reassigned");
       setOpen(false);
     } catch (error) {

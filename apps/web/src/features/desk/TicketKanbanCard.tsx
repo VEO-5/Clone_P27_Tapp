@@ -52,7 +52,7 @@ export function TicketKanbanCard({ ticket }: { ticket: DeskTicket }) {
 
         <Link
           href={`/desk/tickets/${ticket.id}`}
-          className="line-clamp-2 min-h-9 text-[13px] font-medium leading-snug tracking-tight text-pearl underline-offset-4 hover:underline"
+          className="line-clamp-2 min-h-9 text-[13px] font-medium leading-snug tracking-tight text-pearl underline-offset-4 hover:underline break-words"
           title={`${ticket.reference} · ${categoryName(ticket.categoryId)}`}
         >
           {ticket.title}

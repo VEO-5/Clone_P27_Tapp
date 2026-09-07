@@ -1,9 +1,10 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import type { Assignee, DeskTicket } from "@pearl27/contracts";
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { Loader2 } from "lucide-react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/shadcn/button";
@@ -39,8 +40,6 @@ function LiveIndicator({ status }: { status: "live" | "reconnecting" | "off" }) 
 }
 
 function QueueContent({ params, query }: { params: ReturnType<typeof readQueueParams>; query: string }) {
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [pages, setPages] = useState<DeskTicket[][]>([]);
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const [helpOpen, setHelpOpen] = useState(false);
   const focusedIndexRef = useRef(-1);
@@ -48,13 +47,19 @@ function QueueContent({ params, query }: { params: ReturnType<typeof readQueuePa
   const session = useSession();
   const { status } = useDeskEvents(true);
 
-  const queue = useQuery({
-    queryKey: ["desk", "tickets", query, cursor ?? "first"],
-    queryFn: async () => {
-      const page = await apiFetch<QueuePage>(`/desk/tickets${query}${query.includes("?") ? "&" : "?"}limit=8${cursor ? `&cursor=${cursor}` : ""}`);
-      setPages((prev) => [...prev, page.items]);
+  // Infinite list: each cursor is its own page. Refetch replaces pages in
+  // place (no append-on-refetch), so a claimed ticket leaves Unassigned and a
+  // released ticket leaves Mine immediately instead of ghosting.
+  const queue = useInfiniteQuery({
+    queryKey: ["desk", "tickets", query],
+    queryFn: async ({ pageParam }: { pageParam: string | null }) => {
+      const page = await apiFetch<QueuePage>(
+        `/desk/tickets${query}${query.includes("?") ? "&" : "?"}limit=12${pageParam ? `&cursor=${pageParam}` : ""}`,
+      );
       return page;
     },
+    initialPageParam: null as string | null,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
   });
   const agentsQuery = useQuery({
     queryKey: ["desk", "agents"],
@@ -62,10 +67,41 @@ function QueueContent({ params, query }: { params: ReturnType<typeof readQueuePa
     staleTime: 300_000,
   });
 
-  const seen = new Set<string>();
-  const rows = pages.flat().filter((t) => (seen.has(t.id) ? false : (seen.add(t.id), true)));
+  // Latest copy wins: a refetch that changes assignee/status replaces the row
+  // instead of keeping the stale first-seen copy.
+  const rows = useMemo(() => {
+    const seen = new Map<string, DeskTicket>();
+    for (const page of queue.data?.pages ?? []) {
+      for (const t of page.items) seen.set(t.id, t);
+    }
+    return [...seen.values()];
+  }, [queue.data]);
   const role = session.data?.role === "admin" ? "admin" : "agent";
   const agents = agentsQuery.data ?? [];
+  const desktopSentinelRef = useRef<HTMLDivElement | null>(null);
+  const mobileSentinelRef = useRef<HTMLDivElement | null>(null);
+
+  // Infinite scroll: when the end-of-list sentinel scrolls into view, pull
+  // the next page automatically — no Load more button to hunt for below the
+  // fold. One sentinel per layout (desktop table frame via the footer prop,
+  // mobile cards list below); the hidden layout never intersects, so only
+  // the visible one drives loading.
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = queue;
+  useEffect(() => {
+    if (!hasNextPage || isFetchingNextPage) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          void fetchNextPage();
+        }
+      },
+      { rootMargin: "400px" },
+    );
+    for (const sentinel of [desktopSentinelRef.current, mobileSentinelRef.current]) {
+      if (sentinel) observer.observe(sentinel);
+    }
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage, query]);
 
   useEffect(() => {
     focusedIndexRef.current = focusedIndex;
@@ -102,8 +138,11 @@ function QueueContent({ params, query }: { params: ReturnType<typeof readQueuePa
   ]);
 
   return (
-    <div className="flex h-[calc(100dvh-6.5rem)] flex-col overflow-hidden pb-2">
-      <div className="mb-4 flex shrink-0 flex-wrap items-end justify-between gap-3">
+    // Full-height frame: the 2.25rem subtraction matches the DeskShell
+    // content column (pt-3 + pb-6), same formula as the board — the table
+    // frame below is the ONLY scroller and the page column never moves.
+    <div className="flex h-[calc(100dvh-2.25rem)] flex-col overflow-hidden pb-2">
+      <div className="mb-3 flex shrink-0 flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-display text-[32px] font-bold tracking-tight text-black">Support queue</h1>
         </div>
@@ -143,15 +182,25 @@ function QueueContent({ params, query }: { params: ReturnType<typeof readQueuePa
             </p>
           </Panel>
         )}
-        {queue.data && rows.length === 0 && (
+        {queue.data && rows.length === 0 && !queue.isFetching && (
           <Panel tone="night">
             <EmptyState
               tone="night"
-              title={params.tab === "mine" ? "Your queue is clear" : "Nothing here"}
+              title={
+                params.tab === "mine"
+                  ? "Your queue is clear"
+                  : params.tab === "by-agent"
+                    ? "Pick an agent to inspect their queue"
+                    : "Nothing here"
+              }
               description={
                 params.tab === "unassigned"
                   ? "No unassigned tickets. Nice — grab a coffee."
-                  : "Try widening the filters or search."
+                  : params.tab === "by-agent"
+                    ? "Choose an agent above — an empty pick never shows All."
+                    : params.tab === "all"
+                      ? "Every incoming request lives here — try widening the filters or search."
+                      : "Try widening the filters or search."
               }
               action={
                 params.tab !== "all" ? (
@@ -163,7 +212,7 @@ function QueueContent({ params, query }: { params: ReturnType<typeof readQueuePa
             />
           </Panel>
         )}
-        {/* Desktop: one data table (Load more lives inside the scroll frame). Mobile: cards. */}
+        {/* Desktop: one data table (infinite scroll lives inside the scroll frame). Mobile: cards. */}
         <div className="hidden lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
           <TicketTable
             tickets={rows}
@@ -171,16 +220,15 @@ function QueueContent({ params, query }: { params: ReturnType<typeof readQueuePa
             agents={agents}
             focusedIndex={focusedIndex}
             onFocusIndex={setFocusedIndex}
-            frameClassName="no-scrollbar"
+            frameClassName="slim-scrollbar"
             footer={
-              queue.data?.nextCursor ? (
-                <Button
-                  variant="outline"
-                  onClick={() => setCursor(queue.data!.nextCursor)}
-                  disabled={queue.isFetching}
-                >
-                  {queue.isFetching ? "Loading…" : "Load more"}
-                </Button>
+              rows.length > 0 ? (
+                <ListEndStatus
+                  sentinelRef={desktopSentinelRef}
+                  hasNextPage={queue.hasNextPage}
+                  isFetchingNextPage={queue.isFetchingNextPage}
+                  total={rows.length}
+                />
               ) : undefined
             }
           />
@@ -197,21 +245,56 @@ function QueueContent({ params, query }: { params: ReturnType<typeof readQueuePa
               onFocusIndex={setFocusedIndex}
             />
           ))}
+          {rows.length > 0 && (
+            <div className="flex shrink-0 justify-center pb-1">
+              <ListEndStatus
+                sentinelRef={mobileSentinelRef}
+                hasNextPage={queue.hasNextPage}
+                isFetchingNextPage={queue.isFetchingNextPage}
+                total={rows.length}
+              />
+            </div>
+          )}
         </div>
-        {queue.data?.nextCursor && (
-          <div className="mt-3 flex shrink-0 justify-center lg:hidden">
-            <Button
-              variant="outline"
-              onClick={() => setCursor(queue.data!.nextCursor)}
-              disabled={queue.isFetching}
-            >
-              {queue.isFetching ? "Loading…" : "Load more"}
-            </Button>
-          </div>
-        )}
       </div>
       <KeyboardShortcutsHelp open={helpOpen} onOpenChange={setHelpOpen} />
     </div>
+  );
+}
+
+/**
+ * End-of-list status: the sentinel div triggers the next page load, the
+ * text tells you where you are — "Scroll for more" mid-list, a spinner
+ * while fetching, and an explicit "all caught up" marker at the end so the
+ * finish line is never hidden below the fold.
+ */
+function ListEndStatus({
+  sentinelRef,
+  hasNextPage,
+  isFetchingNextPage,
+  total,
+}: {
+  sentinelRef: React.Ref<HTMLDivElement>;
+  hasNextPage: boolean;
+  isFetchingNextPage: boolean;
+  total: number;
+}) {
+  return (
+    <span className="inline-flex items-center gap-2 text-[12.5px] text-fog">
+      <span ref={sentinelRef} aria-hidden className="inline-block h-px w-px" />
+      <span role="status">
+        {isFetchingNextPage ? (
+          <span className="inline-flex items-center gap-1.5">
+            <Loader2 className="size-3.5 animate-spin" aria-hidden />
+            Loading more…
+          </span>
+        ) : hasNextPage ? (
+          "Scroll for more"
+        ) : (
+          `You're all caught up · Showing all ${total} request${total === 1 ? "" : "s"}`
+        )}
+      </span>
+    </span>
   );
 }
 
@@ -226,7 +309,12 @@ export function DeskQueue() {
 /** Reads the URL inside Suspense; key resets pages when filters change. */
 function QueueParamsReader() {
   const searchParams = useSearchParams();
+  const session = useSession();
   const params = readQueueParams(searchParams);
-  const query = queueQueryString(params);
-  return <QueueContent key={query} params={params} query={query} />;
+  // Admins have no Mine tab: a bare /desk/queue opens All for them (no
+  // mine→all flicker + wrong first query). Agents keep Mine.
+  const effective =
+    !searchParams.get("tab") && session.data?.role === "admin" ? { ...params, tab: "all" as const } : params;
+  const query = queueQueryString(effective);
+  return <QueueContent key={query} params={effective} query={query} />;
 }

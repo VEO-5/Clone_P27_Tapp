@@ -16,6 +16,7 @@ import { ApiError, apiFetch } from "@/lib/api";
 import { formatDateTime, formatRelative, requesterEmail } from "@/lib/utils";
 
 import { AssignDialog, ReleaseDialog } from "./OwnershipDialogs";
+import { invalidateDesk, ownershipLabel, useOwnership } from "./ownership";
 
 /**
  * Support-ticket data table (Image-2 structure):
@@ -86,15 +87,16 @@ export function TicketPriorityDot({ priority }: { priority: DeskTicket["priority
 }
 
 // ---------------------------------------------------------------------------
-// UserCell: 48px avatar, 16px/600 name, gray email + company
+// UserCell: 32px avatar, 14px/600 name, gray email — compact so 6+ rows fit
+// the queue frame at a glance.
 // ---------------------------------------------------------------------------
 
 export function UserCell({ ticket }: { ticket: DeskTicket }) {
   const name = ticket.requesterName ?? "Employee";
   const email = requesterEmail(name);
   return (
-    <div className="flex items-start gap-3">
-      <UserAvatar email={email} name={name} className="size-9" />
+    <div className="flex items-center gap-2">
+      <UserAvatar email={email} name={name} className="size-8" />
       <div className="min-w-0">
         <p className="truncate text-[14px] font-semibold text-pearl">{name}</p>
         <p className="truncate text-[12px] text-fog">{email}</p>
@@ -113,11 +115,11 @@ export function IssueCell({ ticket }: { ticket: DeskTicket }) {
       <p className="mono-ref text-[11.5px] font-semibold text-iris-700">{ticket.reference}</p>
       <Link
         href={`/desk/tickets/${ticket.id}`}
-        className="mt-0.5 block truncate text-[14px] font-semibold text-pearl underline-offset-4 hover:underline"
+        className="mt-px block truncate text-[14px] font-semibold text-pearl underline-offset-4 hover:underline"
       >
         {ticket.title}
       </Link>
-      <p className="mt-0.5 truncate text-[12px] text-fog">{categoryName(ticket.categoryId)}</p>
+      <p className="mt-px truncate text-[12px] text-fog">{categoryName(ticket.categoryId)}</p>
     </div>
   );
 }
@@ -149,13 +151,13 @@ function AssignmentButton({ ticket }: { ticket: DeskTicket }) {
     setClaiming(true);
     try {
       await apiFetch(`/desk/tickets/${ticket.id}/claim`, { method: "POST" });
-      await queryClient.invalidateQueries({ queryKey: ["desk", "tickets"] });
+      await invalidateDesk(queryClient);
       toast.success("Assigned to you");
     } catch (error) {
       if (error instanceof ApiError && error.code === "ALREADY_ASSIGNED") {
         const assignee = error.details?.assignee as { name?: string } | undefined;
         toast.error(`Already taken by ${assignee?.name ?? "another agent"}`);
-        await queryClient.invalidateQueries({ queryKey: ["desk", "tickets"] });
+        await invalidateDesk(queryClient);
       } else {
         toast.error(error instanceof Error ? error.message : "Couldn't assign this ticket.");
       }
@@ -195,12 +197,17 @@ export function TicketActions({
   role: "agent" | "admin";
   agents: Assignee[];
 }) {
-  const lockedByOther = ticket.lock?.lockedByOther ?? false;
-  const unassigned = !ticket.assignee;
-  const mine = !!ticket.assignee && !lockedByOther && role === "agent";
-  const canClaim = role !== "admin" && unassigned && !lockedByOther;
-  const canRelease = !unassigned && (!lockedByOther || role === "admin");
-  const showAssign = role === "admin" && !lockedByOther;
+  const { mine, canClaim, canRelease, canAssign, isTerminal } = useOwnership(ticket, role);
+
+  // Resolved is terminal: history stays visible in All, but no ownership
+  // actions for anyone (reopen via status change first).
+  if (isTerminal) {
+    return (
+      <span className="whitespace-nowrap text-[12.5px] text-fog" title="Resolved — read only">
+        → {ticket.assignee?.name ?? "Unassigned"}
+      </span>
+    );
+  }
 
   return (
     <span className="inline-flex items-center gap-1.5">
@@ -211,9 +218,11 @@ export function TicketActions({
           <ReleaseDialog ticket={ticket} />
         </span>
       ) : ticket.assignee ? (
-        <span className="whitespace-nowrap text-[12.5px] text-fog">→ {ticket.assignee.name}</span>
+        <span className="whitespace-nowrap text-[12.5px] text-fog" title={ownershipLabel(ticket)}>
+          → {ticket.assignee.name}
+        </span>
       ) : null}
-      {showAssign && (
+      {canAssign && (
         <span data-action="assign">
           <AssignDialog ticket={ticket} agents={agents} />
         </span>
@@ -248,34 +257,34 @@ export function TicketRow({
       tabIndex={focused ? 0 : -1}
       data-focused={focused || undefined}
       onClick={() => onFocusIndex?.(index ?? 0)}
-      className={`snap-start scroll-mt-[52px] bg-white transition-colors last:[&_td]:border-b-0 hover:bg-ink-900/60 ${focused ? "bg-ink-900/60 outline outline-2 outline-iris-400" : ""}`}
+      className={`bg-white transition-colors last:[&_td]:border-b-0 hover:bg-ink-900/60 ${focused ? "bg-ink-900/60 outline outline-2 outline-iris-400" : ""}`}
     >
-      <td className="w-[4%] border-b border-ink-700 px-2 py-2 align-top">
+      <td className="w-[4%] border-b border-ink-700 px-2 py-1.5 align-top">
         <span className="text-[12.5px] tabular-nums text-fog">{(index ?? 0) + 1}</span>
       </td>
-      <td className="w-[20%] min-w-48 border-b border-ink-700 px-4 py-2 align-top">
+      <td className="w-[20%] min-w-48 border-b border-ink-700 px-4 py-1.5 align-top">
         <UserCell ticket={ticket} />
       </td>
-      <td className="w-[34%] min-w-64 border-b border-ink-700 px-4 py-2 align-top">
+      <td className="w-[34%] min-w-64 border-b border-ink-700 px-4 py-1.5 align-top">
         <IssueCell ticket={ticket} />
       </td>
-      <td className="w-[11%] border-b border-ink-700 px-2.5 py-2 align-middle">
+      <td className="w-[11%] border-b border-ink-700 px-2.5 py-1.5 align-middle">
         <TicketStatusDot status={ticket.status} />
       </td>
-      <td className="w-[10%] border-b border-ink-700 px-2.5 py-2 align-middle">
+      <td className="w-[10%] border-b border-ink-700 px-2.5 py-1.5 align-middle">
         <TicketPriorityDot priority={ticket.priority} />
       </td>
-      <td className="w-[10%] border-b border-ink-700 px-2.5 py-2 align-middle">
+      <td className="w-[10%] border-b border-ink-700 px-2.5 py-1.5 align-middle">
         <SubmittedTime ticket={ticket} />
       </td>
-      <td className="w-[11%] border-b border-ink-700 px-2.5 py-2 align-middle">
+      <td className="w-[11%] border-b border-ink-700 px-2.5 py-1.5 align-middle">
         <TicketActions ticket={ticket} role={role} agents={agents} />
       </td>
     </tr>
   );
 }
 
-const HEADER_CELL = "sticky top-0 z-10 border-b border-ink-700 bg-white px-4 py-3 text-left text-[14px] font-medium text-fog";
+const HEADER_CELL = "sticky top-0 z-10 border-b border-ink-700 bg-white px-4 py-2.5 text-left text-[14px] font-medium text-fog";
 
 /** One large table container — header + one row per ticket. */
 export function TicketTable({
@@ -294,11 +303,11 @@ export function TicketTable({
   onFocusIndex?: (index: number) => void;
   /** Rendered inside the scroll frame, after the last row (e.g. Load more). */
   footer?: React.ReactNode;
-  /** Extra classes on the scroll frame (e.g. `no-scrollbar` on the queue page). */
+  /** Extra classes on the scroll frame (e.g. `slim-scrollbar` on the queue page). */
   frameClassName?: string;
 }) {
   return (
-    <div className={`overflow-x-auto rounded-[4px] border border-ink-700 bg-white shadow-[0_1px_2px_rgba(27,42,74,0.06)] lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:[scroll-snap-type:y_proximity]${frameClassName ? ` ${frameClassName}` : ""}`}>
+    <div className={`overflow-x-auto rounded-[4px] border border-ink-700 bg-white shadow-[0_1px_2px_rgba(27,42,74,0.06)] lg:min-h-0 lg:flex-1 lg:overflow-y-auto${frameClassName ? ` ${frameClassName}` : ""}`}>
       <table aria-label="Support tickets" className="w-full min-w-240 border-separate border-spacing-0">
         <colgroup>
           <col style={{ width: "4%" }} />

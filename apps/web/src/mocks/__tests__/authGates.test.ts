@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeEach } from "vitest";
 
 import { apiFetch } from "@/lib/api";
+import { resetDeskStore } from "@/mocks/desk";
 import { resetAdmins, resetAgents, setMockSession } from "@/mocks/fixtures";
 
 // API-shaped authorization: 401 signed out, 403 wrong role, 404 for
@@ -10,6 +11,7 @@ describe("mock authorization gates", () => {
   beforeEach(() => {
     resetAgents();
     resetAdmins();
+    resetDeskStore();
     setMockSession(null);
   });
 
@@ -57,6 +59,40 @@ describe("mock authorization gates", () => {
     await expect(
       apiFetch("/auth/resolve", { method: "POST", body: JSON.stringify({ email: "ada@gmail.com" }) }),
     ).rejects.toMatchObject({ status: 422 });
+  });
+
+  it("agents get 403 on ticket assign (admin-only); admins can assign", async () => {
+    setMockSession("agent");
+    await expect(
+      apiFetch("/desk/tickets/t-desk-3/assign", {
+        method: "POST",
+        body: JSON.stringify({ assigneeId: "u-agent-2" }),
+      }),
+    ).rejects.toMatchObject({ status: 403, code: "FORBIDDEN" });
+    setMockSession("admin");
+    const ticket = await apiFetch<{ assignee: { name: string } }>("/desk/tickets/t-desk-3/assign", {
+      method: "POST",
+      body: JSON.stringify({ assigneeId: "u-agent-2" }),
+    });
+    expect(ticket.assignee.name).toBe("Ada Osei");
+  });
+
+  it("release is owner-or-admin only; resolved never releases", async () => {
+    setMockSession("agent"); // Kofi (u-agent-1); t-desk-7 belongs to Ada
+    await expect(
+      apiFetch("/desk/tickets/t-desk-7/release", { method: "POST", body: JSON.stringify({}) }),
+    ).rejects.toMatchObject({ status: 403, code: "FORBIDDEN" });
+    // t-desk-10 is resolved and assigned — Release must not regress it.
+    await expect(
+      apiFetch("/desk/tickets/t-desk-10/release", { method: "POST", body: JSON.stringify({}) }),
+    ).rejects.toMatchObject({ status: 422, code: "RESOLVED" });
+    setMockSession("admin");
+    const released = await apiFetch<{ assignee: null; status: string }>("/desk/tickets/t-desk-7/release", {
+      method: "POST",
+      body: JSON.stringify({ reason: "cover" }),
+    });
+    expect(released.assignee).toBeNull();
+    expect(released.status).toBe("pending");
   });
 
   it("sign-out sticks: /auth/me is 401 afterwards", async () => {

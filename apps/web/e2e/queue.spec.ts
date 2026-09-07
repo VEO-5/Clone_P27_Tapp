@@ -100,18 +100,20 @@ test("FE-3.15: mobile queue layout", async ({ page }) => {
   await expect(page.getByLabel(/status/i)).toBeVisible();
 });
 
-// FE-3.17: cursor pagination appends without duplicates.
-test("FE-3.17: load more appends unique rows", async ({ page }) => {
+// FE-3.17: infinite scroll appends without duplicates + end marker shows.
+test("FE-3.17: scrolling loads the full list without duplicates", async ({ page }) => {
   await signInAsAgent(page);
   await page.goto("/desk/queue?tab=all");
-  const rows = () => page.locator("article, tr[data-ticket-row]");
+  // Desktop table rows only (mobile cards render hidden alongside).
+  const rows = () => page.locator("tr[data-ticket-row]");
   const refs = () => rows().evaluateAll((nodes) => nodes.map((n) => n.getAttribute("aria-label") ?? ""));
   await expect(rows().first()).toBeVisible();
-  const before = await refs();
-  await page.getByRole("button", { name: /load more/i }).click();
+  expect((await refs()).length).toBe(12);
+  await rows().last().scrollIntoViewIfNeeded();
   await expect(async () => {
-    expect((await refs()).length).toBeGreaterThan(before.length);
+    expect((await refs()).length).toBe(16);
   }).toPass();
   const after = await refs();
   expect(new Set(after).size).toBe(after.length);
+  await expect(page.getByText(/you're all caught up/i).first()).toBeVisible();
 });

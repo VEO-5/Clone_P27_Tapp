@@ -93,6 +93,7 @@ let tickets: DeskTicket[] = seedTickets();
 
 export function resetDeskStore() {
   tickets = seedTickets();
+  ownershipAudit = [];
 }
 
 /**
@@ -115,6 +116,38 @@ export function openAsAssignee(id: string, viewerId: string): { ticket: DeskTick
 /** Raw mutable handle for the send flow (mock server-side only). */
 export function mutableDeskTicket(id: string): DeskTicket | undefined {
   return tickets.find((t) => t.id === id);
+}
+
+// ---------------------------------------------------------------------------
+// Ownership audit trail (prod parity: every claim/release/assign is logged
+// with actor + before/after so admin audit + timeline stay in sync).
+// ---------------------------------------------------------------------------
+
+export interface OwnershipAuditEntry {
+  id: string;
+  actorId: string;
+  actorName: string;
+  action: "ticket.claimed" | "ticket.released" | "ticket.assigned";
+  ticketId: string;
+  reference: string;
+  beforeAssigneeId: string | null;
+  afterAssigneeId: string | null;
+  reason: string | null;
+  createdAt: string;
+}
+
+let ownershipAudit: OwnershipAuditEntry[] = [];
+
+export function listOwnershipAudit(): OwnershipAuditEntry[] {
+  return [...ownershipAudit];
+}
+
+function logOwnership(entry: Omit<OwnershipAuditEntry, "id" | "createdAt">) {
+  ownershipAudit.unshift({
+    ...entry,
+    id: `own-${Date.now()}-${ownershipAudit.length}`,
+    createdAt: new Date().toISOString(),
+  });
 }
 
 export function listDeskTickets(): DeskTicket[] {
@@ -145,7 +178,14 @@ export function queryDeskTickets(query: QueueQuery): { items: DeskTicket[]; next
 
   if (query.tab === "unassigned") items = items.filter((t) => !t.assignee);
   else if (query.tab === "mine") items = items.filter((t) => t.assignee?.id === viewer);
-  else if (query.tab === "by-agent" && query.assigneeId) items = items.filter((t) => t.assignee?.id === query.assigneeId);
+  // Admin oversight: picking no agent must NOT fall through to All — the UI
+  // shows an explicit "Choose an agent" empty state instead.
+  else if (query.tab === "by-agent") {
+    if (!query.assigneeId) return { items: [], nextCursor: null };
+    items = items.filter((t) => t.assignee?.id === query.assigneeId);
+  }
+  // tab === "all" (or unknown) intentionally returns every incoming support
+  // request: pending + open + in_progress + resolved, assigned or not.
   if (query.status) items = items.filter((t) => t.status === query.status);
   if (query.priority) items = items.filter((t) => t.priority === query.priority);
   if (query.categoryId) items = items.filter((t) => t.categoryId === query.categoryId);
@@ -162,46 +202,130 @@ export function queryDeskTickets(query: QueueQuery): { items: DeskTicket[]; next
   return { items: slice, nextCursor: start + query.limit < items.length ? String(start + query.limit) : null };
 }
 
-/** Claim result: 200 ticket, or 409 conflict naming the winner. */
-export function claimTicket(id: string): { ok: true; ticket: DeskTicket } | { ok: false; assignee: Assignee } {
+export type ClaimError = { code: "ALREADY_ASSIGNED"; assignee: Assignee } | { code: "RESOLVED" };
+
+/** Claim result: 200 ticket, 409 conflict naming the winner, or 422 when resolved. */
+export function claimTicket(id: string): { ok: true; ticket: DeskTicket } | { ok: false; error: ClaimError } {
   const ticket = tickets.find((t) => t.id === id);
   if (!ticket) throw new Error("not found");
+  // Resolved is terminal — reopen via status change, never via claim.
+  if (ticket.status === "resolved") {
+    return { ok: false, error: { code: "RESOLVED" } };
+  }
   const viewer = getMockProfile();
   const me: Assignee = { id: viewer?.id ?? ME, name: viewer?.name ?? "Kofi Mensah", avatarUrl: null };
   if (ticket.assignee && ticket.assignee.id !== me.id) {
-    return { ok: false, assignee: ticket.assignee };
+    return { ok: false, error: { code: "ALREADY_ASSIGNED", assignee: ticket.assignee } };
   }
+  const before = ticket.assigneeId;
+  const alreadyMine = before === me.id;
   ticket.assignee = me;
   ticket.assigneeId = me.id;
   ticket.status = ticket.status === "pending" ? "open" : ticket.status;
   ticket.version += 1;
   ticket.updatedAt = new Date().toISOString();
+  if (!alreadyMine) {
+    logOwnership({
+      actorId: me.id,
+      actorName: me.name,
+      action: "ticket.claimed",
+      ticketId: ticket.id,
+      reference: ticket.reference,
+      beforeAssigneeId: before ?? null,
+      afterAssigneeId: me.id,
+      reason: null,
+    });
+  }
   return { ok: true, ticket: listDeskTickets().find((t) => t.id === id)! };
 }
 
-export function releaseTicket(id: string, reason?: string): DeskTicket | null {
+export type ReleaseError =
+  | { code: "FORBIDDEN"; ownerName: string }
+  | { code: "RESOLVED" }
+  | { code: "NOT_ASSIGNED" }
+  | { code: "REASON_TOO_LONG" };
+
+const MAX_RELEASE_REASON = 500;
+
+export function releaseTicket(
+  id: string,
+  reason?: string,
+  actor?: { id: string; name: string; role: string },
+): DeskTicket | { error: ReleaseError } | null {
   const ticket = tickets.find((t) => t.id === id);
   if (!ticket) return null;
+  const cleanReason = (reason ?? "").trim() || null;
+  if (cleanReason && cleanReason.length > MAX_RELEASE_REASON) {
+    return { error: { code: "REASON_TOO_LONG" } };
+  }
+  // Resolved is terminal — Release must never regress it to pending.
+  if (ticket.status === "resolved") {
+    return { error: { code: "RESOLVED" } };
+  }
+  if (!ticket.assignee) {
+    return { error: { code: "NOT_ASSIGNED" } };
+  }
+  // Owner-or-admin only. The UI hides the button, the server enforces it.
+  const viewerId = actor?.id ?? getMockProfile()?.id ?? ME;
+  const isAdmin = actor?.role === "admin" || getMockProfile()?.role === "admin";
+  if (ticket.assignee.id !== viewerId && !isAdmin) {
+    return { error: { code: "FORBIDDEN", ownerName: ticket.assignee.name } };
+  }
   const prev = ticket.assignee;
   ticket.previousRelease = prev
-    ? { status: ticket.status, agentName: prev.name, releasedAt: new Date().toISOString(), reason: reason ?? null }
+    ? { status: ticket.status, agentName: prev.name, releasedAt: new Date().toISOString(), reason: cleanReason }
     : ticket.previousRelease;
   ticket.assignee = null;
   ticket.assigneeId = null;
   ticket.status = "pending";
   ticket.version += 1;
   ticket.updatedAt = new Date().toISOString();
+  logOwnership({
+    actorId: viewerId,
+    actorName: actor?.name ?? getMockProfile()?.name ?? prev.name,
+    action: "ticket.released",
+    ticketId: ticket.id,
+    reference: ticket.reference,
+    beforeAssigneeId: prev.id,
+    afterAssigneeId: null,
+    reason: cleanReason,
+  });
   return listDeskTickets().find((t) => t.id === id)!;
 }
 
-export function assignTicket(id: string, assigneeId: string): DeskTicket | null {
+export type AssignError = { code: "UNKNOWN_AGENT" } | { code: "RESOLVED" };
+
+export function assignTicket(
+  id: string,
+  assigneeId: string,
+  actor?: { id: string; name: string },
+): DeskTicket | { error: AssignError } | null {
   const ticket = tickets.find((t) => t.id === id);
+  // Unknown agent ids are rejected (never silently unassign).
   const agent = AGENTS.find((a) => a.id === assigneeId);
   if (!ticket || !agent) return null;
+  // Resolved is terminal — reopen via status change first.
+  if (ticket.status === "resolved") {
+    return { error: { code: "RESOLVED" } };
+  }
+  const before = ticket.assigneeId;
   ticket.assignee = agent;
   ticket.assigneeId = agent.id;
   ticket.version += 1;
   ticket.updatedAt = new Date().toISOString();
+  if (before !== agent.id) {
+    const viewer = getMockProfile();
+    logOwnership({
+      actorId: actor?.id ?? viewer?.id ?? ME,
+      actorName: actor?.name ?? viewer?.name ?? "Admin",
+      action: "ticket.assigned",
+      ticketId: ticket.id,
+      reference: ticket.reference,
+      beforeAssigneeId: before ?? null,
+      afterAssigneeId: agent.id,
+      reason: null,
+    });
+  }
   return listDeskTickets().find((t) => t.id === id)!;
 }
 

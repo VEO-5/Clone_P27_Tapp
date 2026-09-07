@@ -111,8 +111,12 @@ export function QueueFilters({ agents, isAdmin = false }: { agents: Assignee[]; 
   const searchKey = [params.tab, params.assigneeId, params.status, params.priority, params.categoryId, params.sort].join("|");
 
   return (
+    // Tabs own the first line. The second line pairs search with the
+    // selects as one non-wrapping row pinned right, so the Sort dropdown
+    // never drops a line when the sidebar is expanded. Below xl the
+    // stacked layout + Filters drawer are unchanged.
     <div className="flex flex-col gap-3">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Tabs
           value={params.tab}
           onValueChange={(value) => set({ tab: value as DeskTab, assigneeId: "" })}
@@ -127,7 +131,19 @@ export function QueueFilters({ agents, isAdmin = false }: { agents: Assignee[]; 
           </TabsList>
         </Tabs>
 
-        <div className="flex gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setFiltersOpen((open) => !open)}
+          aria-expanded={filtersOpen}
+          className="lg:hidden"
+        >
+          Filters
+        </Button>
+      </div>
+
+      <div className="flex flex-col gap-2 lg:flex-row lg:items-center xl:flex-nowrap xl:justify-end xl:gap-x-3">
+        <div className="flex gap-2 lg:contents xl:flex xl:min-w-0 xl:flex-1">
           <label htmlFor="queue-search" className="sr-only">
             Search tickets
           </label>
@@ -138,24 +154,15 @@ export function QueueFilters({ agents, isAdmin = false }: { agents: Assignee[]; 
             placeholder="Search reference, title…"
             defaultValue={params.q}
             onChange={(event) => onSearchChange(event.target.value)}
-            className="h-9 w-full lg:w-64"
+            className="h-9 w-full lg:w-64 xl:w-full"
           />
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setFiltersOpen((open) => !open)}
-            aria-expanded={filtersOpen}
-            className="lg:hidden"
-          >
-            Filters
-          </Button>
         </div>
-      </div>
-
-      <div className={`${filtersOpen ? "flex" : "hidden"} flex-col gap-2 lg:flex lg:flex-row lg:items-center`}>
+        <div
+          className={`${filtersOpen ? "flex" : "hidden"} flex-col gap-2 lg:flex lg:flex-row lg:items-center lg:gap-2 xl:contents`}
+        >
         {isAdmin && params.tab === "by-agent" && (
           <Select value={params.assigneeId || "none"} onValueChange={(v) => set({ assigneeId: v === "none" ? "" : v })}>
-            <SelectTrigger aria-label="Filter by agent" className="w-full lg:w-44">
+            <SelectTrigger aria-label="Filter by agent" className="w-full lg:w-44 xl:w-36 xl:shrink-0 2xl:w-44">
               <SelectValue placeholder="Choose an agent" />
             </SelectTrigger>
             <SelectContent>
@@ -169,7 +176,7 @@ export function QueueFilters({ agents, isAdmin = false }: { agents: Assignee[]; 
           </Select>
         )}
         <Select value={params.status || "all"} onValueChange={(v) => set({ status: v === "all" ? "" : v })}>
-          <SelectTrigger aria-label="Filter by status" className="w-full lg:w-40">
+          <SelectTrigger aria-label="Filter by status" className="w-full lg:w-40 xl:w-36 xl:shrink-0 2xl:w-40">
             <SelectValue placeholder="All statuses" />
           </SelectTrigger>
           <SelectContent>
@@ -182,7 +189,7 @@ export function QueueFilters({ agents, isAdmin = false }: { agents: Assignee[]; 
         </Select>
 
         <Select value={params.priority || "all"} onValueChange={(v) => set({ priority: v === "all" ? "" : v })}>
-          <SelectTrigger aria-label="Filter by priority" className="w-full lg:w-40">
+          <SelectTrigger aria-label="Filter by priority" className="w-full lg:w-40 xl:w-36 xl:shrink-0 2xl:w-40">
             <SelectValue placeholder="All priorities" />
           </SelectTrigger>
           <SelectContent>
@@ -195,7 +202,7 @@ export function QueueFilters({ agents, isAdmin = false }: { agents: Assignee[]; 
         </Select>
 
         <Select value={params.sort || "newest"} onValueChange={(v) => set({ sort: v })}>
-          <SelectTrigger aria-label="Sort tickets" className="w-full lg:w-40">
+          <SelectTrigger aria-label="Sort tickets" className="w-full lg:w-40 xl:w-36 xl:shrink-0 2xl:w-40">
             <SelectValue placeholder="Newest first" />
           </SelectTrigger>
           <SelectContent>
@@ -204,6 +211,7 @@ export function QueueFilters({ agents, isAdmin = false }: { agents: Assignee[]; 
             <SelectItem value="due">Due soonest</SelectItem>
           </SelectContent>
         </Select>
+        </div>
       </div>
     </div>
   );
