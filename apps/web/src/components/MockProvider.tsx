@@ -18,11 +18,20 @@ export function MockProvider({ children }: { children: React.ReactNode }) {
       // Children don't render until then — no reload races with sign-in.
       await worker.start({ onUnhandledRequest: "bypass" });
       if (cancelled) return;
-      // The worker realm holds its own session copy: re-seed it from the
-      // cookie so every role (not just employee) survives reloads, and a
-      // cleared cookie stays signed out.
       try {
-        const { readMockCookieIdentity } = await import("@/mocks/fixtures");
+        const { readMockCookieIdentity, readMockJournal } = await import("@/mocks/fixtures");
+        // Directory journal first: worker restarts wipe invites, so replay
+        // them BEFORE the session reseed or invitees drop to employee.
+        const journal = readMockJournal();
+        if (journal.length > 0) {
+          await fetch(`${config.apiUrl}/mock-invites/restore`, {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ entries: journal }),
+          }).catch(() => undefined);
+        }
+        if (cancelled) return;
         const identity = readMockCookieIdentity();
         if (identity) {
           await fetch(`${config.apiUrl}/mock-session`, {

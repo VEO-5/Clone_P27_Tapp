@@ -15,7 +15,7 @@ import {
 import { Input } from "@/components/shadcn/input";
 import { Label } from "@/components/shadcn/label";
 import { apiFetch, ApiError } from "@/lib/api";
-import type { MockAgent } from "@/mocks/fixtures";
+import { recordMockDirectory, type MockAgent } from "@/mocks/fixtures";
 
 /** Create-agent dialog: single email field, domain validated inline before any request. */
 export function CreateAgentDialog({ onCreated }: { onCreated: (agent: MockAgent) => void }) {
@@ -38,6 +38,9 @@ export function CreateAgentDialog({ onCreated }: { onCreated: (agent: MockAgent)
         method: "POST",
         body: JSON.stringify({ email: parsed.data.email }),
       });
+      // Journal the invite so it survives worker restarts (page reloads) —
+      // MockProvider replays it into the worker on every boot.
+      recordMockDirectory({ role: "agent", email: agent.email, name: agent.name, status: agent.status });
       onCreated(agent);
       setOpen(false);
       setEmail("");

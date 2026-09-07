@@ -10,8 +10,12 @@ import {
   lookupMockIdentity,
   mockAdmins,
   mockAgents,
+  resetAdmins,
+  resetAgents,
+  restoreMockDirectory,
   setMockSession,
   setMockSessionIdentity,
+  type MockJournalEntry,
   type MockProfile,
 } from "./fixtures";
 import {
@@ -25,6 +29,7 @@ import {
   listEmployeeTickets,
   mockKnownIssues,
   rateTicket,
+  resetEmployeeStore,
   shouldFailFirstPut,
   unratedResolvedTickets,
 } from "./employee";
@@ -38,11 +43,14 @@ import {
   listOwnershipAudit,
   queryDeskTickets,
   releaseTicket,
+  resetDeskStore,
 } from "./desk";
 import {
   getDeskDetail,
   heartbeat,
   pushLiveEmployeeMessage,
+  resetConversations,
+  resetPresence,
   sendToTicket,
 } from "./conversations";
 import {
@@ -58,6 +66,8 @@ import {
   listCategories,
   listKnownIssues,
   patchSettings,
+  resetAdminStore,
+  resetCategories,
   updateCategory,
   updateKnownIssue,
 } from "./admin";
@@ -141,6 +151,31 @@ export const handlers = [
     } else if (body.role === null || body.role === undefined) {
       setMockSession(null);
     }
+    return HttpResponse.json({ ok: true });
+  }),
+  http.post(`${API}/mock-invites/restore`, async ({ request }) => {
+    // Mock-only: replays the browser's directory journal (invites +
+    // deactivations) into the worker realm on boot, BEFORE the session
+    // reseed below. Without this, a worker restart wipes invites and
+    // invitees drop to employee on refresh. Malformed entries are skipped.
+    // NEVER copy this pattern to prod: the real backend persists invites in
+    // its database, and an unauthenticated restore would be self-elevation.
+    const body = (await request.json().catch(() => ({}))) as { entries?: unknown };
+    const entries = Array.isArray(body?.entries) ? (body.entries as MockJournalEntry[]) : [];
+    return HttpResponse.json(restoreMockDirectory(entries));
+  }),
+  http.post(`${API}/mock-reset`, () => {
+    // Mock-only: full demo reset (stores + session). The page clears its
+    // journal + cookie alongside; see DemoResetButton.
+    resetAgents();
+    resetAdmins();
+    resetDeskStore();
+    resetConversations();
+    resetPresence();
+    resetAdminStore();
+    resetCategories();
+    resetEmployeeStore();
+    setMockSession(null);
     return HttpResponse.json({ ok: true });
   }),
   http.get(`${API}/categories`, () => HttpResponse.json(listCategories())),

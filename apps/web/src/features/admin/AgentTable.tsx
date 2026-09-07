@@ -22,7 +22,7 @@ import {
 } from "@/components/shadcn/table";
 import { apiFetch } from "@/lib/api";
 import { formatRelative } from "@/lib/utils";
-import type { MockAgent } from "@/mocks/fixtures";
+import { recordMockDirectory, type MockAgent } from "@/mocks/fixtures";
 
 import { CreateAgentDialog } from "./CreateAgentDialog";
 
@@ -45,6 +45,8 @@ export function AgentTable({ initialAgents }: { initialAgents: MockAgent[] }) {
 
   async function deactivate(agent: MockAgent) {
     const updated = await apiFetch<MockAgent>(`/admin/agents/${agent.id}`, { method: "DELETE" });
+    // Journal the removal so a refresh can't resurrect the account.
+    recordMockDirectory({ role: "agent", email: updated.email, name: updated.name, status: updated.status });
     setAgents((list) => list.map((item) => (item.id === agent.id ? updated : item)));
     setConfirming(null);
     setNotice(`${agent.email} deactivated — their ${agent.openTickets} open tickets were released to Pending.`);

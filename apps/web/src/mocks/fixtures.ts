@@ -297,8 +297,7 @@ export function setMockSessionIdentity(identity: MockIdentity | null) {
 }
 
 /** Cookie value for the current identity (null = clear the cookie). */
-export function mockCookieValue(): string | null {
-  if (!mockIdentity) return null;
+export function mockCookieValue(): string | null {  if (!mockIdentity) return null;
   const seedEmail = SEED_IDENTITY[mockIdentity.role].email;
   return mockIdentity.email === seedEmail
     ? `mock-${mockIdentity.role}`
@@ -343,4 +342,154 @@ export function getMockProfile(): MockProfile | null {
     role: mockIdentity.role,
     teamId: mockIdentity.role === "employee" ? null : "support",
   };
+}
+
+// ---------------------------------------------------------------------------
+// Directory journal (mock-only invite persistence).
+//
+// The page realm and the MSW worker realm each hold their own copy of the
+// agent/admin stores, and the worker's copy resets when it restarts (e.g. a
+// page reload) — so an invite created moments ago vanishes and the invitee
+// drops to employee on refresh. The journal fixes this: UI write-sites
+// (invite / deactivate) append here (localStorage survives reloads) and
+// MockProvider replays it into the worker on every boot, BEFORE the session
+// reseed, so role lookup finds the invite again.
+//
+// NEVER copy this pattern to prod: the real backend persists invites in its
+// database. This exists only because the mock has no database.
+// ---------------------------------------------------------------------------
+
+export interface MockJournalEntry {
+  role: "agent" | "admin";
+  email: string;
+  name?: string;
+  status: "active" | "invited" | "deactivated";
+}
+
+const JOURNAL_KEY = "p27_mock_directory_v1";
+
+function journalStorage(): Storage | null {
+  try {
+    if (typeof localStorage === "undefined") return null;
+    return localStorage;
+  } catch {
+    return null;
+  }
+}
+
+function isJournalEntry(value: unknown): value is MockJournalEntry {
+  if (typeof value !== "object" || value === null) return false;
+  const entry = value as Record<string, unknown>;
+  return (
+    (entry.role === "agent" || entry.role === "admin") &&
+    typeof entry.email === "string" &&
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(entry.email) &&
+    (entry.status === "active" || entry.status === "invited" || entry.status === "deactivated") &&
+    (entry.name === undefined || typeof entry.name === "string")
+  );
+}
+
+/** All journaled directory changes, oldest first. Empty outside the browser or when cleared. */
+export function readMockJournal(): MockJournalEntry[] {
+  try {
+    const raw = journalStorage()?.getItem(JOURNAL_KEY);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(isJournalEntry).map((entry) => ({
+      role: entry.role,
+      email: entry.email.trim().toLowerCase(),
+      ...(entry.name ? { name: entry.name } : {}),
+      status: entry.status,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+/** Append a directory change (invite / deactivate). Last write wins per role+email on replay. */
+export function recordMockDirectory(entry: MockJournalEntry): void {
+  const store = journalStorage();
+  if (!store) return;
+  const email = entry.email.trim().toLowerCase();
+  if (!email.endsWith("@pearl27.com")) return;
+  try {
+    const next = [...readMockJournal(), { ...entry, email }];
+    store.setItem(JOURNAL_KEY, JSON.stringify(next.slice(-200)));
+  } catch {
+    // Storage full or unavailable — the invite still works until reload.
+  }
+}
+
+/** Wipe the journal (demo reset). Does not touch live stores — use /mock-reset for that. */
+export function clearMockJournal(): void {
+  try {
+    journalStorage()?.removeItem(JOURNAL_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+function slugDirectoryId(email: string, role: "agent" | "admin"): string {
+  const local = (email.split("@")[0] ?? "unknown")
+    .replace(/[^a-z0-9]+/gi, "-")
+    .replace(/^-+|-+$/g, "")
+    .toLowerCase();
+  return `${role === "admin" ? "u-adm" : "u-agt"}-${local || "unknown"}`;
+}
+
+/**
+ * Apply journaled entries to the live stores (worker realm on boot).
+ * Upserts by email with last-wins ordering; malformed entries are skipped.
+ * Returns how many records were (re)created per store.
+ */
+export function restoreMockDirectory(entries: MockJournalEntry[]): { agents: number; admins: number } {
+  let agents = 0;
+  let admins = 0;
+  for (const raw of entries) {
+    if (!isJournalEntry(raw)) continue;
+    const email = raw.email.trim().toLowerCase();
+    if (!email.endsWith("@pearl27.com")) continue;
+    const name = raw.name?.trim() || deriveMockName(email);
+    if (raw.role === "admin") {
+      const existing = adminStore.find((item) => item.email === email);
+      if (existing) {
+        existing.status = raw.status;
+        existing.name = name;
+      } else {
+        adminStore.push({
+          id: slugDirectoryId(email, "admin"),
+          email,
+          name,
+          avatarUrl: null,
+          role: "admin",
+          teamId: "support",
+          status: raw.status,
+          openTickets: 0,
+          lastSeen: null,
+        });
+      }
+      admins += 1;
+    } else {
+      const existing = agentStore.find((item) => item.email === email);
+      if (existing) {
+        existing.status = raw.status;
+        existing.name = name;
+      } else {
+        agentStore.push({
+          id: slugDirectoryId(email, "agent"),
+          email,
+          name,
+          avatarUrl: null,
+          role: "agent",
+          teamId: "support",
+          status: raw.status,
+          openTickets: 0,
+          lastSeen: null,
+        });
+      }
+      agents += 1;
+    }
+  }
+  return { agents, admins };
 }

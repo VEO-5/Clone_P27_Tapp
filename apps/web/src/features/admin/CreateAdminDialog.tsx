@@ -15,7 +15,7 @@ import {
 import { Input } from "@/components/shadcn/input";
 import { Label } from "@/components/shadcn/label";
 import { apiFetch, ApiError } from "@/lib/api";
-import type { MockAgent } from "@/mocks/fixtures";
+import { recordMockDirectory, type MockAgent } from "@/mocks/fixtures";
 
 /** Create-admin dialog: single email field, domain validated inline before any request. */
 export function CreateAdminDialog({ onCreated }: { onCreated: (admin: MockAgent) => void }) {
@@ -38,6 +38,9 @@ export function CreateAdminDialog({ onCreated }: { onCreated: (admin: MockAgent)
         method: "POST",
         body: JSON.stringify({ email: parsed.data.email }),
       });
+      // Journal the grant so it survives worker restarts (page reloads) —
+      // MockProvider replays it into the worker on every boot.
+      recordMockDirectory({ role: "admin", email: admin.email, name: admin.name, status: admin.status });
       onCreated(admin);
       setOpen(false);
       setEmail("");

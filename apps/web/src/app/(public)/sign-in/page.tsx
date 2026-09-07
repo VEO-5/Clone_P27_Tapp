@@ -1,4 +1,5 @@
 import { MockSignInButtons } from "@/features/auth/MockSignInButtons";
+import { DemoResetButton } from "@/features/auth/DemoResetButton";
 import { SignInButton } from "@/features/auth/SignInButton";
 import { Panel, PanelHeader } from "@/components/ui/Panel";
 
@@ -30,6 +31,11 @@ export default async function SignInPage({
             After sign-in, you land on your home: employees on My tickets, agents on the Desk,
             admins on the Dashboard.
           </p>
+          {MOCK && (
+            <p className="text-center">
+              <DemoResetButton />
+            </p>
+          )}
         </div>
       </Panel>
     </div>

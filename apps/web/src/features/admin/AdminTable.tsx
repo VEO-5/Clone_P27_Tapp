@@ -22,7 +22,7 @@ import {
 } from "@/components/shadcn/table";
 import { apiFetch } from "@/lib/api";
 import { formatRelative } from "@/lib/utils";
-import type { MockAgent } from "@/mocks/fixtures";
+import { recordMockDirectory, type MockAgent } from "@/mocks/fixtures";
 
 import { CreateAdminDialog } from "./CreateAdminDialog";
 
@@ -45,6 +45,8 @@ export function AdminTable({ initialAdmins }: { initialAdmins: MockAgent[] }) {
 
   async function deactivate(admin: MockAgent) {
     const updated = await apiFetch<MockAgent>(`/admin/admins/${admin.id}`, { method: "DELETE" });
+    // Journal the removal so a refresh can't resurrect the account.
+    recordMockDirectory({ role: "admin", email: updated.email, name: updated.name, status: updated.status });
     setAdmins((list) => list.map((item) => (item.id === admin.id ? updated : item)));
     setConfirming(null);
     setNotice(`${admin.email} deactivated — they lost admin access immediately.`);
