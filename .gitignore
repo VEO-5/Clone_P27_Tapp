@@ -9,6 +9,8 @@
 node_modules/
 .next/
 .vercel/
+.turbo/
+test-output.txt
 .data/
 .tmp*
 coverage/
