@@ -7,6 +7,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import { router } from "./router";
+import { MockProvider } from "./components/MockProvider";
 import "./fonts.css";
 import "./styles.css";
 
@@ -18,7 +19,9 @@ if (!root) throw new Error("Missing #root element");
 createRoot(root).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
+      <MockProvider>
+        <RouterProvider router={router} />
+      </MockProvider>
     </QueryClientProvider>
   </StrictMode>,
 );

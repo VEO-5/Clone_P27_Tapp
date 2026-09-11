@@ -13,7 +13,8 @@
     "isolatedModules": true,
     "jsx": "react-jsx",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@pearl27/contracts": ["./src/lib/contracts.vendored.ts"]
     },
     "types": ["vite/client"]
   },

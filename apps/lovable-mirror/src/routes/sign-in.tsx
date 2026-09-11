@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 
+import { Panel, PanelHeader } from "@/components/ui/Panel";
+import { MockSignInButtons } from "@/features/auth/MockSignInButtons";
 import { signInSearchSchema } from "@/lib/auth-guard";
 
 // Mirrors apps/web/src/app/(public)/sign-in/page.tsx (title "Sign in").
-// Real body: MockSignInButtons / SignInButton (?next= round trip) + Panel.
 // ?next= is typed per route — after login the app navigates there (FE-L-4.6).
 export const Route = createFileRoute("/sign-in")({
   validateSearch: signInSearchSchema,
@@ -12,9 +13,20 @@ export const Route = createFileRoute("/sign-in")({
     const { next } = Route.useSearch();
     return (
       <div className="mx-auto max-w-xl px-4 py-20 sm:px-6">
-        <p className="eyebrow">Sign in</p>
-        <h1>Sphere Support</h1>
-        <p className="text-sm opacity-70">PORT: features/auth/MockSignInButtons (next={next}).</p>
+        <Panel lit>
+          <PanelHeader
+            eyebrow="Sign in"
+            title="Sphere Support"
+            description="Use your Pearl 27 work email — we recognize your role. Admins invite agents and admins; everyone else signs in as an employee, no account needed."
+          />
+          <div className="flex flex-col gap-4 p-6 sm:p-8">
+            <MockSignInButtons next={next ?? "/"} />
+            <p className="text-[13px] leading-relaxed text-fog">
+              After sign-in, you land on your home: employees on My tickets, agents on the Desk,
+              admins on the Dashboard.
+            </p>
+          </div>
+        </Panel>
       </div>
     );
   },

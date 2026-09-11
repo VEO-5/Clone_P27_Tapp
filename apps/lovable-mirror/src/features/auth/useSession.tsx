@@ -7,6 +7,8 @@ import { ApiError, apiFetch } from "@/lib/api";
 import { config } from "@/lib/config";
 import { queryKeys } from "@/lib/query";
 
+import { mockSignOut } from "./mockSession";
+
 /** Session profile: the API contract plus mock-only flags. */
 export interface SessionProfile extends Profile {
   /** True when a deactivated desk/admin account fell back to employee. */
@@ -27,9 +29,9 @@ export function useSession() {
 
 /**
  * POST /auth/logout, clear the query cache, go to /sign-in.
- * MIRROR note: the mock-session branch (mockSignOut awaiting the MSW worker)
- * is not ported — the mirror has no MSW worker. The real scaffold + backend
- * own the mock story; prod behavior (clear + navigate) is identical.
+ * Mock branch restored: mockSignOut awaits the MSW worker (wired via
+ * MockProvider when VITE_API_MOCK=true) — same comment as the original:
+ * navigating on a live session is how sign-out "unsticks".
  */
 export function useSignOut() {
   const queryClient = useQueryClient();
@@ -41,7 +43,9 @@ export function useSignOut() {
       // Clearing local state matters more than the server round-trip.
     } finally {
       if (config.apiMock) {
-        // No MSW worker in the mirror — nothing to confirm against.
+        // Confirm the worker forgot the session BEFORE touching local
+        // state — navigating on a live session is how sign-out "unsticks".
+        await mockSignOut();
       }
       queryClient.clear();
       await navigate({ to: "/sign-in", search: { next: "/" } });
