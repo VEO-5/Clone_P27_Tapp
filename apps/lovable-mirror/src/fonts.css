@@ -1,0 +1,9 @@
+/* MIRROR fonts — self-hosted via @fontsource-variable (never Google Fonts).
+ * Declares the three CSS vars globals consume: --font-inter -> --font-sans,
+ * --font-jakarta -> --font-display, --font-jetbrains -> --font-mono.
+ * styles.css below its var block stays untouched per the migration plan. */
+:root {
+  --font-inter: "Inter Variable", "Inter", ui-sans-system, -apple-system, "Segoe UI", system-ui, sans-serif;
+  --font-jakarta: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", var(--font-inter);
+  --font-jetbrains: "JetBrains Mono Variable", "JetBrains Mono", "Courier New", monospace;
+}

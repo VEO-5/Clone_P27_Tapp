@@ -1,0 +1,334 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* ==========================================================================
+   Pearl 27 — Sphere Support Desk
+
+   Tokens taken from pearl27.com: cream paper, navy ink, copper accent.
+   Type: Inter (body/UI) + Plus Jakarta Sans (headings) + JetBrains Mono (refs).
+   ========================================================================== */
+
+@theme {
+  --color-ink-950: #faf9f6;
+  --color-ink-900: #f3f0e8;
+  --color-ink-850: #ffffff;
+  --color-ink-800: #ffffff;
+  --color-ink-700: #e4dfd4;
+  --color-ink-600: #d4cec0;
+  --color-ink-500: #2c406b;
+
+  --color-pearl: #1b2a4a;
+  --color-pearl-dim: #243656;
+  --color-mist: #4a5568;
+  --color-fog: #6b7280;
+
+  --color-night: #162035;
+  --color-night-deep: #101828;
+  --color-cream: #faf9f6;
+  --color-haze: #b4bdc9;
+
+  --color-iris-300: #e8872b;
+  --color-iris-400: #e8872b;
+  --color-iris-500: #e8872b;
+  --color-iris-600: #c97020;
+  --color-iris-700: #a85f16;
+  --color-aqua-400: #2c406b;
+  --color-aqua-500: #243656;
+  --color-rose-400: #c23b3b;
+  --color-gold-400: #e8872b;
+  --color-jade-400: #2f7a4f;
+
+  --font-sans: var(--font-inter), ui-sans-system, -apple-system, "Segoe UI", system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), "Courier New", monospace;
+  --font-display: var(--font-jakarta), var(--font-inter), ui-sans-system, system-ui, sans-serif;
+
+  --animate-aurora: aurora 26s ease-in-out infinite;
+  --animate-rise: rise 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-shimmer: shimmer 2.4s linear infinite;
+  --animate-pulse-ring: pulse-ring 2.6s ease-out infinite;
+}
+
+/* ==========================================================================
+   shadcn/ui semantic tokens — every value maps onto the Pearl 27 palette so
+   registry components render on-brand (light-only, no dark variant).
+   ========================================================================== */
+:root {
+  --radius: 0.625rem;
+  --background: #ffffff;
+  --foreground: #1b2a4a;
+  --card: #ffffff;
+  --card-foreground: #1b2a4a;
+  --popover: #ffffff;
+  --popover-foreground: #1b2a4a;
+  --primary: #e8872b;
+  --primary-foreground: #1b2a4a;
+  --secondary: #f3f0e8;
+  --secondary-foreground: #1b2a4a;
+  --muted: #f3f0e8;
+  --muted-foreground: #4a5568;
+  --accent: #f3f0e8;
+  --accent-foreground: #1b2a4a;
+  --destructive: #c23b3b;
+  --border: #e4dfd4;
+  --input: #d4cec0;
+  --ring: #e8872b;
+  --chart-1: #e8872b;
+  --chart-2: #2c406b;
+  --chart-3: #2f7a4f;
+  --chart-4: #c97020;
+  --chart-5: #6b7280;
+  --sidebar: #faf9f6;
+  --sidebar-foreground: #1b2a4a;
+  --sidebar-primary: #e8872b;
+  --sidebar-primary-foreground: #1b2a4a;
+  --sidebar-accent: #f3f0e8;
+  --sidebar-accent-foreground: #1b2a4a;
+  --sidebar-border: #e4dfd4;
+  --sidebar-ring: #e8872b;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@keyframes aurora {
+  0%,
+  100% {
+    transform: translate3d(-4%, -2%, 0) scale(1);
+    opacity: 0.55;
+  }
+  33% {
+    transform: translate3d(6%, 4%, 0) scale(1.08);
+    opacity: 0.8;
+  }
+  66% {
+    transform: translate3d(-2%, 7%, 0) scale(1.03);
+    opacity: 0.45;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-iris-500) 35%, transparent);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 12px transparent;
+  }
+}
+
+@layer base {
+  * {
+    border-color: var(--color-ink-700);
+  }
+
+  html {
+    color-scheme: light;
+    scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
+    /* Reserve the scrollbar gutter everywhere so routes with window scroll
+       (ticket detail) and locked shells (/admin) share the same width. */
+    scrollbar-gutter: stable;
+    /* Belt and suspenders: gutter alone doesn't hold when Radix scroll-lock
+       propagates body overflow to the viewport (the viewport scrollbar is
+       destroyed and rebuilt). A permanent scrollbar can never appear,
+       disappear, or shift the layout. */
+    overflow-y: scroll;
+  }
+
+  body {
+    background-color: var(--color-ink-950);
+    color: var(--color-pearl);
+    font-family: var(--font-sans);
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Radix scroll-lock compensates for the hidden scrollbar by adding body
+     padding/margin — but the gutter is already reserved (see html above),
+     so the extra compensation double-counts and shakes the page by exactly
+     one scrollbar width. Drop it; the overflow lock itself stays intact. */
+  body[data-scroll-locked] {
+    padding-right: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-iris-400);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--color-iris-500) 28%, transparent);
+    color: var(--color-pearl);
+  }
+
+  ::placeholder {
+    color: var(--color-fog);
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+    font-weight: 650;
+    font-family: var(--font-display);
+    letter-spacing: -0.025em;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-ink-600) transparent;
+  }
+}
+
+@utility glass {
+  background: #ffffff;
+  border: 1px solid rgba(27, 42, 74, 0.12);
+  box-shadow:
+    0 1px 3px rgba(27, 42, 74, 0.06),
+    0 8px 24px -12px rgba(27, 42, 74, 0.12);
+}
+
+@utility glass-night {
+  background: #162035;
+  border: 1px solid rgba(250, 249, 246, 0.08);
+  color: #faf9f6;
+  box-shadow:
+    0 1px 3px rgba(16, 24, 40, 0.2),
+    0 18px 40px -18px rgba(16, 24, 40, 0.55);
+}
+
+.glass-night .eyebrow {
+  color: #e8872b;
+}
+
+@utility hairline {
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    transparent,
+    rgba(27, 42, 74, 0.16) 20%,
+    rgba(27, 42, 74, 0.16) 80%,
+    transparent
+  );
+}
+
+@utility text-iridescent {
+  color: var(--color-pearl);
+  font-style: normal;
+}
+
+@utility eyebrow {
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--color-fog);
+}
+
+@utility mono-ref {
+  font-family: var(--font-mono);
+  font-variant-ligatures: none;
+  letter-spacing: 0.04em;
+}
+
+/* Hides the scrollbar while keeping the frame scrollable. Apply only where
+   the page explicitly asks for a chromeless scroll region. */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Slim scrollbar for data-table frames: transparent track with a faint
+   thumb always visible so users can see scroll position at a glance,
+   full-strength on hover (same ink language as the DeskShell column). */
+@utility slim-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--color-ink-600) 45%, transparent) transparent;
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--color-ink-600) 45%, transparent);
+  }
+  &:hover {
+    scrollbar-color: var(--color-ink-600) transparent;
+    &::-webkit-scrollbar-thumb {
+      background: var(--color-ink-600);
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
