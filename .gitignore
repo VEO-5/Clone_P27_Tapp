@@ -23,6 +23,8 @@ playwright-report/
 # OS / editor
 .DS_Store
 *.pem
+*.log
+*.log.*
 
 # Web app local env (example is committed)
 apps/web/.env
