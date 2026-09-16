@@ -8,6 +8,8 @@ import { createRoot } from "react-dom/client";
 
 import { router } from "./router";
 import { MockProvider } from "./components/MockProvider";
+import { Toaster } from "./components/shadcn/sonner";
+import { TooltipProvider } from "./components/shadcn/tooltip";
 import "./fonts.css";
 import "./styles.css";
 
@@ -20,7 +22,10 @@ createRoot(root).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <MockProvider>
-        <RouterProvider router={router} />
+        <TooltipProvider>
+          <RouterProvider router={router} />
+          <Toaster />
+        </TooltipProvider>
       </MockProvider>
     </QueryClientProvider>
   </StrictMode>,

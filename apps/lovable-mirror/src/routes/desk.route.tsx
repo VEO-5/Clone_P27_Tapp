@@ -1,6 +1,7 @@
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 
 import { RoleGate } from "@/features/auth/RoleGate";
+import { DeskShell } from "@/features/desk/DeskShell";
 
 // Mirrors apps/web/src/app/(desk)/layout.tsx:
 // RoleGate allow=["agent","admin"]. DeskShell wires in with the desk slice;
@@ -9,7 +10,9 @@ export const Route = createFileRoute("/desk")({
   component: function DeskLayoutComponent() {
     return (
       <RoleGate allow={["agent", "admin"]}>
-        <Outlet />
+        <DeskShell>
+          <Outlet />
+        </DeskShell>
       </RoleGate>
     );
   },

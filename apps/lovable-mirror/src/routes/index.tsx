@@ -1,16 +1,24 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
 
-// Mirrors apps/web/src/app/page.tsx: role landing — signed out -> /sign-in,
-// else the role's home (landingForRole). Real session check wires in Phase 4.
+import { Skeleton } from "@/components/shadcn/skeleton";
+import { useSession } from "@/features/auth/useSession";
+import { landingForRole } from "@/lib/auth";
+
 export const Route = createFileRoute("/")({
   head: () => ({ meta: [{ title: "Sphere Support · Pearl 27" }] }),
   component: function RootPageComponent() {
+    const session = useSession();
+    const navigate = useNavigate();
+    useEffect(() => {
+      if (session.isPending) return;
+      const target = session.data ? landingForRole(session.data.role as never) : "/sign-in";
+      void navigate({ to: target as never, replace: true });
+    }, [session.isPending, session.data, navigate]);
     return (
       <div className="mx-auto max-w-xl px-4 py-20" aria-busy="true" aria-label="Loading">
-        <p className="eyebrow">Pearl 27 · Sphere Support</p>
-        <h1>Resolving your home…</h1>
-        <p className="text-sm opacity-70">PORT: useSession + landingForRole redirect.</p>
-        <p className="text-sm opacity-70">Phase 2 ports: /sign-in · /tickets · /desk/queue</p>
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="mt-4 h-24 w-full" />
       </div>
     );
   },
