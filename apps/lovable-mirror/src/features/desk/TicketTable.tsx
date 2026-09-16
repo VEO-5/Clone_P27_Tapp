@@ -12,7 +12,6 @@ import { toast } from "sonner";
 import { Button } from "@/components/shadcn/button";
 import { UserAvatar } from "@/components/UserAvatar";
 import { PriorityIcon, StatusIcon } from "@/components/ui/Badge";
-import { categoryName } from "@/features/tickets/categories";
 import { ApiError, apiFetch } from "@/lib/api";
 import { formatDateTime, formatRelative, requesterEmail } from "@/lib/utils";
 
@@ -47,7 +46,7 @@ const STATUS_ICON: Record<DeskTicket["status"], string> = {
 
 export function TicketStatusDot({ status }: { status: DeskTicket["status"] }) {
   return (
-    <span className="inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded-full border border-ink-600 bg-white px-2.5 text-[12px] font-medium text-pearl shadow-sm">
+    <span className="inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded-full border border-ink-600 bg-white px-2.5 text-[12px] font-medium text-black">
       <StatusIcon status={status} className={`size-3.5 ${STATUS_ICON[status]}`} />
       {STATUS_LABELS[status]}
     </span>
@@ -56,7 +55,7 @@ export function TicketStatusDot({ status }: { status: DeskTicket["status"] }) {
 
 // Priority pill mirrors Section Type chip in Image 1: neutral outline pill.
 const PRIORITY_ICON: Record<DeskTicket["priority"], string> = {
-  low: "text-mist",
+  low: "text-black/40",
   medium: "text-amber-600",
   high: "text-orange-600",
   urgent: "text-rose-600",
@@ -64,7 +63,7 @@ const PRIORITY_ICON: Record<DeskTicket["priority"], string> = {
 
 export function TicketPriorityDot({ priority }: { priority: DeskTicket["priority"] }) {
   return (
-    <span className="inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded-full border border-ink-600 bg-white px-2.5 text-[12px] font-medium text-pearl shadow-sm">
+    <span className="inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded-full border border-ink-600 bg-white px-2.5 text-[12px] font-medium text-black">
       <span className={priority === "urgent" ? "animate-pulse" : undefined}>
         <PriorityIcon priority={priority} className={`size-3.5 ${PRIORITY_ICON[priority]}`} />
       </span>
@@ -85,28 +84,28 @@ export function UserCell({ ticket }: { ticket: DeskTicket }) {
     <div className="flex items-center gap-2">
       <UserAvatar email={email} name={name} className="size-8" />
       <div className="min-w-0">
-        <p className="truncate text-[14px] font-semibold text-pearl">{name}</p>
-        <p className="truncate text-[12px] text-fog">{email}</p>
+        <p className="truncate text-[14px] font-semibold text-black">{name}</p>
+        <p className="truncate text-[12px] text-black/60">{email}</p>
       </div>
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// IssueCell: ref (blue) → bold title → gray category → 2-line description
+// IssueCell: ref (tertiary black) → bold title (primary black). Category
+// removed per design — keeps 2-line density like Image 1.
 // ---------------------------------------------------------------------------
 
 export function IssueCell({ ticket }: { ticket: DeskTicket }) {
   return (
     <div className="min-w-0">
-      <p className="mono-ref text-[11.5px] font-semibold text-iris-700">{ticket.reference}</p>
+      <p className="mono-ref text-[11px] font-medium tracking-wide text-black/50">{ticket.reference}</p>
       <Link
         to={`/desk/tickets/${ticket.id}`}
-        className="mt-px block truncate text-[14px] font-semibold text-pearl underline-offset-4 hover:underline"
+        className="mt-px block truncate text-[14px] font-semibold text-black underline-offset-4 hover:underline"
       >
         {ticket.title}
       </Link>
-      <p className="mt-px truncate text-[12px] text-fog">{categoryName(ticket.categoryId)}</p>
     </div>
   );
 }
@@ -117,7 +116,7 @@ export function IssueCell({ ticket }: { ticket: DeskTicket }) {
 
 export function SubmittedTime({ ticket }: { ticket: DeskTicket }) {
   return (
-    <time dateTime={ticket.createdAt} title={formatDateTime(ticket.createdAt)} className="whitespace-nowrap text-[12.5px] text-mist">
+    <time dateTime={ticket.createdAt} title={formatDateTime(ticket.createdAt)} className="whitespace-nowrap text-[12.5px] text-black/60">
       {formatRelative(ticket.createdAt)}
     </time>
   );
@@ -161,7 +160,7 @@ function AssignmentButton({ ticket }: { ticket: DeskTicket }) {
         disabled={claiming}
         aria-label={`Assign ${ticket.reference} to me`}
         aria-busy={claiming || undefined}
-        className="min-h-10 whitespace-nowrap rounded-[4px] bg-gold-400 px-2.5 text-[13px] font-semibold text-pearl hover:bg-iris-600 hover:text-white"
+        className="min-h-10 whitespace-nowrap rounded-[4px] bg-gold-400 px-2.5 text-[13px] font-semibold text-black hover:bg-iris-600 hover:text-white"
       >
         {claiming && <Loader2 className="animate-spin" aria-hidden />}
         Assign to me
@@ -244,7 +243,7 @@ export function TicketRow({
       tabIndex={focused ? 0 : -1}
       data-focused={focused || undefined}
       onClick={() => onFocusIndex?.(index ?? 0)}
-      className={`group bg-white transition-colors last:[&_td]:border-b-0 hover:bg-ink-900/40 ${focused ? "bg-ink-900/40 outline outline-2 outline-iris-400" : ""}`}
+      className={`group bg-white outline-none transition-colors last:[&_td]:border-b-0 hover:bg-ink-900/40 focus:outline-none focus-visible:outline-none ${focused ? "bg-ink-900/40" : ""}`}
     >
       <td className="w-[3%] border-b border-ink-700 px-1 py-3 align-middle">
         <span
@@ -256,7 +255,7 @@ export function TicketRow({
         </span>
       </td>
       <td className="w-[3%] border-b border-ink-700 px-1 py-3 align-middle">
-        <span className="text-[12.5px] tabular-nums text-fog">{(index ?? 0) + 1}</span>
+        <span className="text-[12.5px] tabular-nums text-black/50">{(index ?? 0) + 1}</span>
       </td>
       <td className="w-[19%] min-w-44 border-b border-ink-700 px-3 py-3 align-middle">
         <UserCell ticket={ticket} />
@@ -280,7 +279,7 @@ export function TicketRow({
   );
 }
 
-const HEADER_CELL = "sticky top-0 z-10 border-b border-ink-700 bg-ink-900 px-3 py-2.5 text-left text-[13px] font-medium text-fog";
+const HEADER_CELL = "sticky top-0 z-10 border-b border-ink-700 bg-ink-900 px-3 py-2.5 text-left text-[13px] font-semibold text-black";
 
 /** One large table container — header + one row per ticket. */
 export function TicketTable({

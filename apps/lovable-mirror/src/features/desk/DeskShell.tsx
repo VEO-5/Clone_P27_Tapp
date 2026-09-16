@@ -80,10 +80,7 @@ function SideLinkRow({ link, collapsed }: { link: SideLink; collapsed: boolean }
           : "text-mist hover:bg-ink-900/60 hover:text-pearl",
       )}
     >
-      {/* Active accent marker (expanded mode only — the rail uses a full pill). */}
-      {link.active && !collapsed && (
-        <span aria-hidden className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-iris-500" />
-      )}
+
       <Icon className="size-4 shrink-0" aria-hidden />
       {!collapsed && (
         <>

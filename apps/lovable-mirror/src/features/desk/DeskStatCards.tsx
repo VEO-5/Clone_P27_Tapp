@@ -46,7 +46,7 @@ export function DeskStatCards({
                 {eyebrow}
               </p>
               <CardContent className="mt-2 rounded-xl border border-ink-700/60 bg-ink-950 px-4 py-3">
-                <p className="font-sans text-[28px] font-semibold leading-none tracking-tight text-pearl tabular-nums">
+                <p className="font-sans text-[28px] font-semibold leading-none tracking-tight text-black tabular-nums">
                   {countFor(key)}
                 </p>
                 {trend && (
