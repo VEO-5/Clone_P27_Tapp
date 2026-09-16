@@ -6,7 +6,7 @@ import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Assignee, DeskTicket } from "@pearl27/contracts";
 import { PRIORITY_LABELS, STATUS_LABELS } from "@pearl27/contracts";
-import { Loader2 } from "lucide-react";
+import { GripVertical, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/shadcn/button";
@@ -35,52 +35,38 @@ import { invalidateDesk, ownershipLabel, useOwnership } from "./ownership";
 // Icons come from the shared badge config — same icon language as the cards.
 // ---------------------------------------------------------------------------
 
-const STATUS_DOT_STYLES: Record<DeskTicket["status"], string> = {
-  pending: "bg-orange-100 text-orange-700",
-  open: "bg-green-100 text-green-700",
-  in_progress: "bg-blue-100 text-blue-700",
-  resolved: "bg-emerald-100 text-emerald-700",
-};
-
+// Image 1 density + Image 2 pill language: pill is white with thin ink border,
+// icon carries the semantic color. Keeps brand pearl for text, not tinted
+// chip fills — matches the  `Done` / `In Process` pills you shared.
 const STATUS_ICON: Record<DeskTicket["status"], string> = {
-  pending: "text-orange-600",
-  open: "text-green-600",
-  in_progress: "text-blue-600",
+  pending: "text-amber-600",
+  open: "text-emerald-600",
+  in_progress: "text-sky-600",
   resolved: "text-emerald-600",
 };
 
 export function TicketStatusDot({ status }: { status: DeskTicket["status"] }) {
   return (
-    <span
-      className={`inline-flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-[4px] px-2 text-[12px] font-medium sm:min-h-7 ${STATUS_DOT_STYLES[status]}`}
-    >
-      <StatusIcon status={status} className={`size-3 ${STATUS_ICON[status]}`} />
+    <span className="inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded-full border border-ink-600 bg-white px-2.5 text-[12px] font-medium text-pearl shadow-sm">
+      <StatusIcon status={status} className={`size-3.5 ${STATUS_ICON[status]}`} />
       {STATUS_LABELS[status]}
     </span>
   );
 }
 
-const PRIORITY_DOT_STYLES: Record<DeskTicket["priority"], string> = {
-  low: "bg-blue-50 text-blue-700",
-  medium: "bg-orange-100 text-orange-700",
-  high: "bg-rose-100 text-rose-700",
-  urgent: "bg-rose-100 text-rose-700",
-};
-
+// Priority pill mirrors Section Type chip in Image 1: neutral outline pill.
 const PRIORITY_ICON: Record<DeskTicket["priority"], string> = {
-  low: "text-blue-600",
-  medium: "text-orange-600",
-  high: "text-rose-500",
+  low: "text-mist",
+  medium: "text-amber-600",
+  high: "text-orange-600",
   urgent: "text-rose-600",
 };
 
 export function TicketPriorityDot({ priority }: { priority: DeskTicket["priority"] }) {
   return (
-    <span
-      className={`inline-flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-[4px] px-2 text-[12px] font-medium sm:min-h-7 ${PRIORITY_DOT_STYLES[priority]}`}
-    >
+    <span className="inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded-full border border-ink-600 bg-white px-2.5 text-[12px] font-medium text-pearl shadow-sm">
       <span className={priority === "urgent" ? "animate-pulse" : undefined}>
-        <PriorityIcon priority={priority} className={`size-3 ${PRIORITY_ICON[priority]}`} />
+        <PriorityIcon priority={priority} className={`size-3.5 ${PRIORITY_ICON[priority]}`} />
       </span>
       {PRIORITY_LABELS[priority]}
     </span>
@@ -258,34 +244,43 @@ export function TicketRow({
       tabIndex={focused ? 0 : -1}
       data-focused={focused || undefined}
       onClick={() => onFocusIndex?.(index ?? 0)}
-      className={`bg-white transition-colors last:[&_td]:border-b-0 hover:bg-ink-900/60 ${focused ? "bg-ink-900/60 outline outline-2 outline-iris-400" : ""}`}
+      className={`group bg-white transition-colors last:[&_td]:border-b-0 hover:bg-ink-900/40 ${focused ? "bg-ink-900/40 outline outline-2 outline-iris-400" : ""}`}
     >
-      <td className="w-[4%] border-b border-ink-700 px-2 py-1.5 align-top">
+      <td className="w-[3%] border-b border-ink-700 px-1 py-3 align-middle">
+        <span
+          className="flex size-6 items-center justify-center rounded text-fog/60 group-hover:text-fog"
+          aria-hidden
+          title="Drag to reorder"
+        >
+          <GripVertical className="size-3.5" />
+        </span>
+      </td>
+      <td className="w-[3%] border-b border-ink-700 px-1 py-3 align-middle">
         <span className="text-[12.5px] tabular-nums text-fog">{(index ?? 0) + 1}</span>
       </td>
-      <td className="w-[20%] min-w-48 border-b border-ink-700 px-4 py-1.5 align-top">
+      <td className="w-[19%] min-w-44 border-b border-ink-700 px-3 py-3 align-middle">
         <UserCell ticket={ticket} />
       </td>
-      <td className="w-[34%] min-w-64 border-b border-ink-700 px-4 py-1.5 align-top">
+      <td className="w-[32%] min-w-56 border-b border-ink-700 px-3 py-3 align-middle">
         <IssueCell ticket={ticket} />
       </td>
-      <td className="w-[11%] border-b border-ink-700 px-2.5 py-1.5 align-middle">
+      <td className="w-[11%] border-b border-ink-700 px-2.5 py-3 align-middle">
         <TicketStatusDot status={ticket.status} />
       </td>
-      <td className="w-[10%] border-b border-ink-700 px-2.5 py-1.5 align-middle">
+      <td className="w-[10%] border-b border-ink-700 px-2.5 py-3 align-middle">
         <TicketPriorityDot priority={ticket.priority} />
       </td>
-      <td className="w-[10%] border-b border-ink-700 px-2.5 py-1.5 align-middle">
+      <td className="w-[10%] border-b border-ink-700 px-2.5 py-3 align-middle">
         <SubmittedTime ticket={ticket} />
       </td>
-      <td className="w-[11%] border-b border-ink-700 px-2.5 py-1.5 align-middle">
+      <td className="w-[12%] border-b border-ink-700 px-2.5 py-3 align-middle">
         <TicketActions ticket={ticket} role={role} agents={agents} />
       </td>
     </tr>
   );
 }
 
-const HEADER_CELL = "sticky top-0 z-10 border-b border-ink-700 bg-white px-4 py-2.5 text-left text-[14px] font-medium text-fog";
+const HEADER_CELL = "sticky top-0 z-10 border-b border-ink-700 bg-ink-900 px-3 py-2.5 text-left text-[13px] font-medium text-fog";
 
 /** One large table container — header + one row per ticket. */
 export function TicketTable({
@@ -308,21 +303,25 @@ export function TicketTable({
   frameClassName?: string;
 }) {
   return (
-    <div className={`overflow-x-auto rounded-[4px] border border-ink-700 bg-white shadow-[0_1px_2px_rgba(27,42,74,0.06)] lg:min-h-0 lg:flex-1 lg:overflow-y-auto${frameClassName ? ` ${frameClassName}` : ""}`}>
+    <div className={`overflow-x-auto rounded-lg border border-ink-700 bg-white shadow-[0_1px_2px_rgba(27,42,74,0.06)] lg:min-h-0 lg:flex-1 lg:overflow-y-auto${frameClassName ? ` ${frameClassName}` : ""}`}>
       <table aria-label="Support tickets" className="w-full min-w-240 border-separate border-spacing-0">
         <colgroup>
-          <col style={{ width: "4%" }} />
-          <col style={{ width: "20%" }} />
-          <col style={{ width: "34%" }} />
+          <col style={{ width: "3%" }} />
+          <col style={{ width: "3%" }} />
+          <col style={{ width: "19%" }} />
+          <col style={{ width: "32%" }} />
           <col style={{ width: "11%" }} />
           <col style={{ width: "10%" }} />
           <col style={{ width: "10%" }} />
-          <col style={{ width: "11%" }} />
+          <col style={{ width: "12%" }} />
         </colgroup>
         <thead>
-          <tr className="bg-white">
-            <th scope="col" className={`${HEADER_CELL} px-2`}>
-              S/N
+          <tr className="bg-ink-900">
+            <th scope="col" className={`${HEADER_CELL} px-1`} aria-label="Drag">
+              <span className="sr-only">Drag</span>
+            </th>
+            <th scope="col" className={`${HEADER_CELL} px-1`}>
+              #
             </th>
             <th scope="col" className={HEADER_CELL}>
               User

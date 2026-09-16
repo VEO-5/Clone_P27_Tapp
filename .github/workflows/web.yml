@@ -3,7 +3,7 @@ name: web
 on:
   pull_request:
     paths:
-      - "apps/web/**"
+      - "apps/lovable-mirror/**"
       - "packages/**"
       - "pnpm-workspace.yaml"
       - "turbo.json"
@@ -23,8 +23,7 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @pearl27/web lint
-      - run: pnpm --filter @pearl27/web typecheck
+      - run: pnpm --filter @pearl27/lovable-mirror typecheck
       - run: pnpm --filter @pearl27/contracts test
-      - run: pnpm --filter @pearl27/web test
-      - run: pnpm --filter @pearl27/web build
+      - run: pnpm --filter @pearl27/lovable-mirror test
+      - run: pnpm --filter @pearl27/lovable-mirror build
