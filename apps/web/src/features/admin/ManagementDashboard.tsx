@@ -3,11 +3,26 @@
 import { useQuery } from "@tanstack/react-query";
 import type { AdminDashboardResponse } from "@pearl27/contracts";
 import { ArrowDownRight, ArrowUpRight, Download } from "lucide-react";
-import Link from "next/link";
 import { useState } from "react";
+import { Area, AreaChart, CartesianGrid, XAxis } from "recharts";
 import { toast } from "sonner";
 
 import { Button } from "@/components/shadcn/button";
+import {
+  ChartContainer,
+  ChartLegend,
+  ChartLegendContent,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/shadcn/chart";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/shadcn/select";
 import { PriorityBadge, StatusBadge } from "@/components/ui/Badge";
 import { Panel, PanelHeader } from "@/components/ui/Panel";
 import { Skeleton } from "@/components/shadcn/skeleton";
@@ -21,7 +36,6 @@ import {
 } from "@/components/shadcn/table";
 import { apiFetch } from "@/lib/api";
 import { config } from "@/lib/config";
-import { formatRelative } from "@/lib/utils";
 
 type Range = "7" | "30" | "90";
 
@@ -63,15 +77,64 @@ function KpiCards({ kpis }: { kpis: AdminDashboardResponse["kpis"] }) {
   );
 }
 
-function VolumeChart({ data }: { data: AdminDashboardResponse["volume"] }) {
-  const [selected, setSelected] = useState<string | null>(null);
-  const max = Math.max(1, ...data.map((d) => Math.max(d.received, d.resolved)));
+const volumeChartConfig = {
+  received: {
+    label: "Received",
+    color: "var(--chart-2)",
+  },
+  resolved: {
+    label: "Resolved",
+    color: "var(--chart-1)",
+  },
+} satisfies ChartConfig;
+
+const RANGE_OPTIONS: { value: Range; label: string }[] = [
+  { value: "90", label: "Last 3 months" },
+  { value: "30", label: "Last 30 days" },
+  { value: "7", label: "Last 7 days" },
+];
+
+function VolumeChart({
+  data,
+  range,
+  onRangeChange,
+}: {
+  data: AdminDashboardResponse["volume"];
+  range: Range;
+  onRangeChange: (range: Range) => void;
+}) {
   const totalReceived = data.reduce((s, d) => s + d.received, 0);
   const totalResolved = data.reduce((s, d) => s + d.resolved, 0);
-  const day = data.find((d) => d.date === selected);
   return (
     <Panel>
-      <PanelHeader eyebrow="Trends" title="Ticket Volume Trend" />
+      <PanelHeader
+        eyebrow="Trends"
+        title="Ticket Volume Trend"
+        action={
+          <Select
+            value={range}
+            onValueChange={(value) => onRangeChange(value as Range)}
+          >
+            <SelectTrigger
+              className="w-[160px] rounded-lg"
+              aria-label="Select date range"
+            >
+              <SelectValue placeholder="Select range" />
+            </SelectTrigger>
+            <SelectContent className="rounded-xl">
+              {RANGE_OPTIONS.map((option) => (
+                <SelectItem
+                  key={option.value}
+                  value={option.value}
+                  className="rounded-lg"
+                >
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        }
+      />
       <div className="p-6">
         <p className="font-display text-3xl text-pearl">
           {totalReceived.toLocaleString()}{" "}
@@ -79,30 +142,87 @@ function VolumeChart({ data }: { data: AdminDashboardResponse["volume"] }) {
             received · {totalResolved.toLocaleString()} resolved
           </span>
         </p>
-        {day && (
-          <p className="mt-1 text-[13px] text-mist" aria-live="polite">
-            {day.date}: {day.received} received, {day.resolved} resolved.
-          </p>
+        {data.length === 0 ? (
+          <p className="mt-4 text-sm text-fog">No ticket volume in this period.</p>
+        ) : (
+          <ChartContainer
+            config={volumeChartConfig}
+            className="mt-4 aspect-auto h-[250px] w-full"
+          >
+            <AreaChart data={data} accessibilityLayer>
+              <defs>
+                <linearGradient id="fillReceived" x1="0" y1="0" x2="0" y2="1">
+                  <stop
+                    offset="5%"
+                    stopColor="var(--color-received)"
+                    stopOpacity={0.8}
+                  />
+                  <stop
+                    offset="95%"
+                    stopColor="var(--color-received)"
+                    stopOpacity={0.1}
+                  />
+                </linearGradient>
+                <linearGradient id="fillResolved" x1="0" y1="0" x2="0" y2="1">
+                  <stop
+                    offset="5%"
+                    stopColor="var(--color-resolved)"
+                    stopOpacity={0.8}
+                  />
+                  <stop
+                    offset="95%"
+                    stopColor="var(--color-resolved)"
+                    stopOpacity={0.1}
+                  />
+                </linearGradient>
+              </defs>
+              <CartesianGrid vertical={false} />
+              <XAxis
+                dataKey="date"
+                tickLine={false}
+                axisLine={false}
+                tickMargin={8}
+                minTickGap={32}
+                tickFormatter={(value) => {
+                  const date = new Date(value);
+                  return date.toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                  });
+                }}
+              />
+              <ChartTooltip
+                cursor={false}
+                content={
+                  <ChartTooltipContent
+                    labelFormatter={(value) => {
+                      return new Date(String(value)).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                      });
+                    }}
+                    indicator="dot"
+                  />
+                }
+              />
+              <Area
+                dataKey="resolved"
+                type="natural"
+                fill="url(#fillResolved)"
+                stroke="var(--color-resolved)"
+                stackId="a"
+              />
+              <Area
+                dataKey="received"
+                type="natural"
+                fill="url(#fillReceived)"
+                stroke="var(--color-received)"
+                stackId="a"
+              />
+              <ChartLegend content={<ChartLegendContent />} />
+            </AreaChart>
+          </ChartContainer>
         )}
-        <div className="mt-4 flex h-44 items-end gap-1" role="group" aria-label={`Ticket volume, ${totalReceived} received total`}>
-          {data.length === 0 && (
-            <p className="text-sm text-fog">No ticket volume in this period.</p>
-          )}
-          {data.map((d) => (
-            <button
-              key={d.date}
-              type="button"
-              onClick={() => setSelected(d.date === selected ? null : d.date)}
-              aria-pressed={d.date === selected}
-              aria-label={`${d.date}: ${d.received} received, ${d.resolved} resolved`}
-              title={`${d.date}: ${d.received} received`}
-              className={`flex min-w-0 flex-1 flex-col justify-end gap-0.5 rounded-[2px] p-0.5 ${d.date === selected ? "bg-ink-900" : ""}`}
-            >
-              <span className="w-full rounded-[2px] bg-ink-600" style={{ height: `${Math.max(3, (d.received / max) * 110)}px` }} aria-hidden />
-              <span className="w-full rounded-[2px] bg-pearl" style={{ height: `${Math.max(3, (d.resolved / max) * 110)}px` }} aria-hidden />
-            </button>
-          ))}
-        </div>
         <table className="sr-only">
           <thead>
             <tr>
@@ -236,57 +356,7 @@ function SlaTable({ rows }: { rows: AdminDashboardResponse["slaTable"] }) {
   );
 }
 
-const UPDATE_KIND_META: Record<
-  AdminDashboardResponse["updates"][number]["kind"],
-  { label: string; className: string }
-> = {
-  assigned: { label: "Assigned", className: "border-iris-400/40 bg-iris-400/10 text-iris-700" },
-  released: { label: "Released", className: "border-amber-200 bg-amber-50 text-amber-700" },
-  message: { label: "Reply", className: "border-jade-400/40 bg-jade-400/10 text-jade-400" },
-  status_changed: { label: "Status", className: "border-sky-200 bg-sky-50 text-sky-700" },
-};
-
-function LatestUpdates({ items }: { items: AdminDashboardResponse["updates"] }) {
-  return (
-    <Panel>
-      <PanelHeader eyebrow="Activity" title="Latest Updates" />
-      {items.length === 0 ? (
-        <p className="p-6 text-sm text-fog">No updates in this period.</p>
-      ) : (
-        <ul className="flex flex-col gap-1 p-3">
-          {items.map((item) => {
-            const meta = UPDATE_KIND_META[item.kind];
-            return (
-              <li key={item.id} className="border-l-2 border-iris-400/60 pl-3">
-                <Link
-                  href={`/desk/tickets/${item.ticketId}`}
-                  aria-label={`${item.text} — ${item.ticketReference}`}
-                  title={`${item.ticketReference}: ${item.text}`}
-                  className="block rounded-[2px] px-1 py-1.5 outline-none transition-colors hover:bg-ink-900/60 focus-visible:ring-2 focus-visible:ring-iris-400"
-                >
-                  <span className="flex flex-wrap items-center gap-2">
-                    <span
-                      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${meta.className}`}
-                    >
-                      {meta.label}
-                    </span>
-                    <span className="mono-ref text-[12px]">{item.ticketReference}</span>
-                  </span>
-                  <p className="mt-1 text-[13.5px] font-medium text-pearl">{item.text}</p>
-                  <p className="mt-0.5 text-[12.5px] text-fog">
-                    {item.actorName} · {formatRelative(item.createdAt)}
-                  </p>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </Panel>
-  );
-}
-
-/** Management analytics: KPIs, volume, agents, SLA, updates, export. */
+/** Management analytics: KPIs, volume, agents, SLA, export. */
 export function ManagementDashboard() {
   const [range, setRange] = useState<Range>("30");
   const dashboard = useQuery({
@@ -327,19 +397,6 @@ export function ManagementDashboard() {
           <p className="mt-1 text-[13px] text-fog">Team performance — last 7 / 30 / 90 days</p>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex gap-1" role="group" aria-label="Date range">
-            {(["7", "30", "90"] as const).map((days) => (
-              <button
-                key={days}
-                type="button"
-                onClick={() => setRange(days)}
-                aria-pressed={range === days}
-                className={`min-h-11 rounded-[2px] px-3 text-[13px] font-medium ${range === days ? "bg-pearl text-cream" : "text-mist hover:text-pearl"}`}
-              >
-                {days}d
-              </button>
-            ))}
-          </div>
           <Button variant="outline" size="sm" onClick={() => void exportCsv()} disabled={exporting}>
             <Download className="size-3.5" aria-hidden />
             Export CSV
@@ -366,10 +423,9 @@ export function ManagementDashboard() {
       {dashboard.data && (
         <div className="flex flex-col gap-6">
           <KpiCards kpis={dashboard.data.kpis} />
-          <VolumeChart data={dashboard.data.volume} />
+          <VolumeChart data={dashboard.data.volume} range={range} onRangeChange={setRange} />
           <AgentTable rows={dashboard.data.byAgent} />
           <SlaTable rows={dashboard.data.slaTable} />
-          <LatestUpdates items={dashboard.data.updates} />
         </div>
       )}
     </div>
