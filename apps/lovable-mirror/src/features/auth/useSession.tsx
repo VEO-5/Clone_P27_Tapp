@@ -8,6 +8,7 @@ import { config } from "@/lib/config";
 import { queryKeys } from "@/lib/query";
 
 import { mockSignOut } from "./mockSession";
+import { liveSignOut } from "./liveSession";
 
 /** Session profile: the API contract plus mock-only flags. */
 export interface SessionProfile extends Profile {
@@ -32,13 +33,18 @@ export function useSession() {
  * Mock branch restored: mockSignOut awaits the MSW worker (wired via
  * MockProvider when VITE_API_MOCK=true) — same comment as the original:
  * navigating on a live session is how sign-out "unsticks".
+ * Live branch: InsForge signOut clears the stored session.
  */
 export function useSignOut() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   return useCallback(async () => {
     try {
-      await apiFetch<void>("/auth/logout", { method: "POST" });
+      if (config.insforgeLive) {
+        await liveSignOut();
+      } else {
+        await apiFetch<void>("/auth/logout", { method: "POST" });
+      }
     } catch {
       // Clearing local state matters more than the server round-trip.
     } finally {

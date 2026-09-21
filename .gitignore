@@ -29,3 +29,18 @@ playwright-report/
 # Web app local env (example is committed)
 apps/web/.env
 apps/web/.env.local
+
+# InsForge & AI agent skills
+.insforge
+.agent
+.agents
+.augment
+.claude
+.cline
+.github/copilot*
+.kilocode
+.qoder
+.qwen
+.roo
+.trae
+.windsurf

@@ -7,11 +7,15 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import { router } from "./router";
+import { AnalyticsSync } from "./components/Analytics";
 import { MockProvider } from "./components/MockProvider";
 import { Toaster } from "./components/shadcn/sonner";
 import { TooltipProvider } from "./components/shadcn/tooltip";
+import { initAnalytics } from "./lib/analytics";
 import "./fonts.css";
 import "./styles.css";
+
+initAnalytics();
 
 const queryClient = new QueryClient();
 
@@ -23,6 +27,7 @@ createRoot(root).render(
     <QueryClientProvider client={queryClient}>
       <MockProvider>
         <TooltipProvider>
+          <AnalyticsSync />
           <RouterProvider router={router} />
           <Toaster />
         </TooltipProvider>

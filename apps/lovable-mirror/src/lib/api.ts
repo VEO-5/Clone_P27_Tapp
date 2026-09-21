@@ -1,4 +1,6 @@
 import { config } from "./config";
+import { trackApiCall, trackApiError } from "./analytics";
+import { liveFetch } from "./live";
 
 export interface ApiErrorShape {
   error: {
@@ -58,10 +60,13 @@ async function parseError(res: Response): Promise<ApiError> {
 }
 
 /**
- * Thin fetch wrapper. Base URL from VITE_API_URL (renamed from
+ * Thin fetch wrapper. Mock mode: base URL from VITE_API_URL (renamed from
  * NEXT_PUBLIC_API_URL), session cookie via credentials:include.
+ * Live mode (VITE_API_MOCK=false + InsForge env): routes through the `api`
+ * Edge Function with the user's Bearer token — same path + error contract.
  */
 export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+  if (config.insforgeLive) return liveFetch<T>(path, init);
   const res = await fetch(`${config.apiUrl}${path}`, {
     ...init,
     credentials: "include",
@@ -70,7 +75,12 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
       ...(init.headers ?? {}),
     },
   });
-  if (!res.ok) throw await parseError(res);
+  if (!res.ok) {
+    const err = await parseError(res);
+    trackApiError(init.method ?? "GET", path, err.status, err.code);
+    throw err;
+  }
+  trackApiCall(init.method ?? "GET", path, init.body);
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
 }

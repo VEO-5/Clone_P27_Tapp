@@ -13,4 +13,14 @@ export const config = {
     const value = import.meta.env.VITE_API_MOCK as string | undefined;
     return value?.trim().toLowerCase() !== "false";
   },
+  get insforgeUrl(): string {
+    return (import.meta.env.VITE_INSFORGE_URL as string | undefined)?.trim() ?? "";
+  },
+  get insforgeAnonKey(): string {
+    return (import.meta.env.VITE_INSFORGE_ANON_KEY as string | undefined)?.trim() ?? "";
+  },
+  /** True when live InsForge calls are possible (mock off + URL/key present). */
+  get insforgeLive(): boolean {
+    return !this.apiMock && Boolean(this.insforgeUrl && this.insforgeAnonKey);
+  },
 } as const;
