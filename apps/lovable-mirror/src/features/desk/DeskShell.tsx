@@ -58,6 +58,7 @@ function readCollapsed(): boolean {
 
 interface SideLink {
   to: string;
+  search?: Record<string, string>;
   label: string;
   icon: ComponentType<{ className?: string }>;
   count?: number;
@@ -69,6 +70,7 @@ function SideLinkRow({ link, collapsed }: { link: SideLink; collapsed: boolean }
   const row = (
     <Link
       to={link.to}
+      search={link.search as never}
       aria-label={collapsed ? link.label : undefined}
       aria-current={link.active ? "page" : undefined}
       className={cn(
@@ -262,7 +264,7 @@ function SidebarFooter({ collapsed }: { collapsed: boolean }) {
             <DropdownMenuSeparator />
             {!isAdmin && (
               <DropdownMenuItem asChild>
-                <Link to="/desk/queue?tab=mine">
+                <Link to="/desk/queue" search={{ tab: "mine" } as never}>
                   <UserRound aria-hidden /> My tickets
                 </Link>
               </DropdownMenuItem>
@@ -331,22 +333,30 @@ function Sidebar({
   const byCategory = dashboard.data?.series.byCategory ?? [];
 
   // Home of the desk: first click under the workspace pill, like other app shells.
-  const overviewLink: SideLink = { to: "/desk", label: isAdmin ? "Home" : "Overview", icon: LayoutDashboard, count: tickets.length || undefined, active: onBoard };
+  // Admins land on /desk/admin — Home must take them there, not to the agent
+  // board (/desk), otherwise the click looks dead when already on /desk.
+  const onAdminRouteEarly = pathname.startsWith("/desk/admin");
+  const overviewLink: SideLink = isAdmin
+    ? { to: "/desk/admin", label: "Home", icon: LayoutDashboard, count: tickets.length || undefined, active: onAdminRouteEarly && pathname === "/desk/admin" }
+    : { to: "/desk", label: "Overview", icon: LayoutDashboard, count: tickets.length || undefined, active: onBoard };
   const views: SideLink[] = [
-    { to: "/desk/queue?tab=mine", label: "My Tickets", icon: UserRound, count: mine || undefined, active: unfilteredQueue && tab === "mine" },
+    { to: "/desk/queue", search: { tab: "mine" }, label: "My Tickets", icon: UserRound, count: mine || undefined, active: unfilteredQueue && tab === "mine" },
   ];
   // Dedicated triage queue: incoming (oldest first) + everything still open.
   // Admins assign from here via the queue's Assign dialog; agents claim next.
+  // NOTE: TanStack Link needs `search` object — query strings inside `to`
+  // never match a route and the click silently does nothing.
   const queueLinks: SideLink[] = [
-    { to: "/desk/queue?tab=unassigned&sort=oldest", label: "Incoming", icon: Inbox, count: unassigned || undefined, active: onQueue && tab === "unassigned" },
-    { to: "/desk/queue?tab=all", label: "All requests", icon: Layers, count: openQueue || undefined, active: unfilteredQueue && tab === "all" },
+    { to: "/desk/queue", search: { tab: "unassigned", sort: "oldest" }, label: "Incoming", icon: Inbox, count: unassigned || undefined, active: onQueue && tab === "unassigned" },
+    { to: "/desk/queue", search: { tab: "all" }, label: "All requests", icon: Layers, count: openQueue || undefined, active: unfilteredQueue && tab === "all" },
   ];
 
   const HIDDEN_CATEGORIES = new Set(["hardware", "network", "email"]);
   const categories: SideLink[] = byCategory
     .filter((c) => !HIDDEN_CATEGORIES.has(c.categoryId))
     .map((c) => ({
-      to: `/desk/queue?tab=all&categoryId=${c.categoryId}`,
+      to: "/desk/queue",
+      search: { tab: "all", categoryId: c.categoryId },
       label: c.categoryName,
       icon: Folder,
       count: c.count || undefined,
@@ -410,15 +420,15 @@ function Sidebar({
                   Workspace
                 </DropdownMenuLabel>
                 <DropdownMenuItem asChild>
-                  <Link to="/desk">
-                    <Check className="size-4 shrink-0 text-jade-400" aria-hidden />
+                  <Link to={isAdmin ? "/desk/admin" : "/desk"}>
+                    <Check className="size-4 shrink-0 text-pearl" aria-hidden />
                     {workspaceName}
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 {!isAdmin && (
                   <DropdownMenuItem asChild>
-                    <Link to="/desk/queue?tab=mine">
+                    <Link to="/desk/queue" search={{ tab: "mine" } as never}>
                       <UserRound aria-hidden /> My tickets
                     </Link>
                   </DropdownMenuItem>
@@ -466,7 +476,7 @@ function Sidebar({
               ))}
             {isAdmin && (
               <SideLinkRow
-                link={{ to: "/admin", label: "Administration", icon: ShieldCheck, active: onAdminRoute }}
+                link={{ to: "/desk/admin", label: "Administration", icon: ShieldCheck, active: onAdminRoute }}
                 collapsed
               />
             )}

@@ -86,14 +86,14 @@ const STATUS_CONFIG: Record<string, StatusConfig> = {
   },
   open: {
     icon: CircleDot,
-    iconClass: "text-sky-600",
-    dotClass: "bg-sky-500",
+    iconClass: "text-pearl-dim",
+    dotClass: "bg-pearl-dim",
     night: "border-cream/20 bg-cream/10 text-cream",
   },
   in_progress: {
     icon: LoaderCircle,
-    iconClass: "text-blue-600",
-    dotClass: "bg-blue-500",
+    iconClass: "text-mist",
+    dotClass: "bg-mist",
     night: "border-iris-400/40 bg-iris-500/15 text-iris-300",
   },
   resolved: {

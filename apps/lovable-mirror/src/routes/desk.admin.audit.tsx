@@ -1,14 +1,21 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-// Mirrors admin audit page (paginated, expandable diffs).
+import { Panel, PanelHeader } from "@/components/ui/Panel";
+import { AuditTable } from "@/features/admin/AuditTable";
+
 export const Route = createFileRoute("/desk/admin/audit")({
   component: function AuditComponent() {
     return (
-      <div className="mx-auto max-w-5xl px-4 py-10">
-        <p className="eyebrow">Admin · Audit</p>
-        <h1>Audit log</h1>
-        <p className="text-sm opacity-70">PORT: audit table (?limit=&cursor=).</p>
-      </div>
+      <Panel lit>
+        <PanelHeader
+          eyebrow="Admin · Audit"
+          title="Audit log"
+          description="Ownership changes, assignments, and settings updates — newest first with expandable diffs."
+        />
+        <div className="p-6 sm:p-8">
+          <AuditTable />
+        </div>
+      </Panel>
     );
   },
 });

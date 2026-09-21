@@ -39,8 +39,8 @@ import { invalidateDesk, ownershipLabel, useOwnership } from "./ownership";
 // chip fills — matches the  `Done` / `In Process` pills you shared.
 const STATUS_ICON: Record<DeskTicket["status"], string> = {
   pending: "text-amber-600",
-  open: "text-emerald-600",
-  in_progress: "text-sky-600",
+  open: "text-pearl-dim",
+  in_progress: "text-mist",
   resolved: "text-emerald-600",
 };
 

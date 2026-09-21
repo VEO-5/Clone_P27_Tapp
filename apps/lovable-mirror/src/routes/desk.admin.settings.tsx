@@ -1,14 +1,21 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-// Mirrors admin settings page (auto-release, hours, holidays, canned + CategoryManager).
+import { Panel, PanelHeader } from "@/components/ui/Panel";
+import { SettingsForm } from "@/features/admin/SettingsForm";
+
 export const Route = createFileRoute("/desk/admin/settings")({
   component: function SettingsComponent() {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-10">
-        <p className="eyebrow">Admin · Settings</p>
-        <h1>Settings</h1>
-        <p className="text-sm opacity-70">PORT: settings form + CategoryManager.</p>
-      </div>
+      <Panel lit>
+        <PanelHeader
+          eyebrow="Admin · Settings"
+          title="Settings"
+          description="Auto-release window, business hours, holidays, canned responses, and ticket categories."
+        />
+        <div className="p-6 sm:p-8">
+          <SettingsForm />
+        </div>
+      </Panel>
     );
   },
 });
