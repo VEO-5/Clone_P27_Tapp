@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Panel, PanelHeader } from "@/components/ui/Panel";
 import { DemoResetButton } from "@/features/auth/DemoResetButton";
 import { EmailSignInForm } from "@/features/auth/EmailSignInForm";
+import { GoogleCallbackHandler, GoogleOAuthButton } from "@/features/auth/GoogleOAuthButton";
 import { MockSignInButtons } from "@/features/auth/MockSignInButtons";
 import { config } from "@/lib/config";
 import { signInSearchSchema } from "@/lib/auth-guard";
@@ -26,10 +27,19 @@ export const Route = createFileRoute("/sign-in")({
             description={
               mock
                 ? "Use your Pearl 27 work email — we recognize your role. Admins invite agents and admins; everyone else signs in as an employee, no account needed."
-                : "Use your Pearl 27 work email — we'll send you a 6-digit code. No password needed."
+                : "One click with your Pearl 27 Google account — or we'll send your work email a 6-digit code. No password needed."
             }
           />
           <div className="flex flex-col gap-4 p-6 sm:p-8">
+            {!mock && <GoogleCallbackHandler next={next ?? "/"} />}
+            {!mock && <GoogleOAuthButton next={next ?? "/"} />}
+            {!mock && (
+              <p aria-hidden className="flex items-center gap-3 text-[11px] font-medium uppercase tracking-[0.12em] text-fog">
+                <span aria-hidden className="h-px flex-1 bg-ink-700" />
+                or email code
+                <span aria-hidden className="h-px flex-1 bg-ink-700" />
+              </p>
+            )}
             <EmailSignInForm next={next ?? "/"} />
             {mock && <MockSignInButtons next={next ?? "/"} />}
             <p className="text-[13px] leading-relaxed text-fog">

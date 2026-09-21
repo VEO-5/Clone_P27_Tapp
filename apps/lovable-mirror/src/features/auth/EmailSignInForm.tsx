@@ -3,7 +3,7 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, Mail } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Button } from "@/components/shadcn/button";
 import { Field, Input } from "@/components/ui/Form";
@@ -27,7 +27,24 @@ export function EmailSignInForm({ next }: { next?: string }) {
   const [codeSent, setCodeSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [signingIn, setSigningIn] = useState(false);
+  // Resend cooldown: stops resend-storms from tripping send throttles and
+  // matches the backend minimum interval between auth emails.
+  const [cooldownLeft, setCooldownLeft] = useState(0);
   const live = config.insforgeLive;
+
+  useEffect(() => {
+    if (cooldownLeft <= 0) return;
+    const timer = setTimeout(() => setCooldownLeft((left) => left - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [cooldownLeft]);
+
+  function friendlySendError(cause: unknown): string {
+    const message = cause instanceof Error ? cause.message : "Couldn't send the code. Try again.";
+    if (/too many|rate|limit|throttl|try again later|wait/i.test(message)) {
+      return "Too many codes sent — wait a minute and try again.";
+    }
+    return message;
+  }
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -47,8 +64,14 @@ export function EmailSignInForm({ next }: { next?: string }) {
         return;
       }
       if (!codeSent) {
-        await liveRequestCode(value);
+        try {
+          await liveRequestCode(value);
+        } catch (cause) {
+          setError(friendlySendError(cause));
+          return;
+        }
         setCodeSent(true);
+        setCooldownLeft(60);
         return;
       }
       if (!code.trim()) {
@@ -107,18 +130,40 @@ export function EmailSignInForm({ next }: { next?: string }) {
         {live ? (codeSent ? "Verify code" : "Send code") : "Continue with email"}
       </Button>
       {live && codeSent && (
-        <button
-          type="button"
-          disabled={signingIn}
-          onClick={() => {
-            setCodeSent(false);
-            setCode("");
-            setError(null);
-          }}
-          className="text-[13px] text-fog underline underline-offset-2"
-        >
-          Use a different email
-        </button>
+        <div className="flex items-center justify-between gap-3">
+          <button
+            type="button"
+            disabled={signingIn || cooldownLeft > 0}
+            onClick={() => {
+              const value = email.trim();
+              if (!value || signingIn) return;
+              setSigningIn(true);
+              liveRequestCode(value)
+                .then(() => {
+                  setError(null);
+                  setCooldownLeft(60);
+                })
+                .catch((cause: unknown) => setError(friendlySendError(cause)))
+                .finally(() => setSigningIn(false));
+            }}
+            className="text-[13px] text-fog underline underline-offset-2 disabled:no-underline disabled:opacity-60"
+          >
+            {cooldownLeft > 0 ? `Resend code in ${cooldownLeft}s` : "Resend code"}
+          </button>
+          <button
+            type="button"
+            disabled={signingIn}
+            onClick={() => {
+              setCodeSent(false);
+              setCode("");
+              setError(null);
+              setCooldownLeft(0);
+            }}
+            className="text-[13px] text-fog underline underline-offset-2"
+          >
+            Use a different email
+          </button>
+        </div>
       )}
     </form>
   );
