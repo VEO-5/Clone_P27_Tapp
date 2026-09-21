@@ -17,4 +17,10 @@ if (!baseUrl || !anonKey) {
 export const insforge = createClient({
   baseUrl: baseUrl ?? "",
   anonKey: anonKey ?? "",
+  // Explicit OAuth callback handling (see features/auth/googleOAuth.ts).
+  // The SDK's auto-detect strips ?insforge_code= at import time and exchanges
+  // it in the background while swallowing every failure into console.debug —
+  // that silent path stranded users on the sign-in page with no session and
+  // no error. We exchange the code ourselves so all outcomes are visible.
+  auth: { detectOAuthCallback: false },
 });

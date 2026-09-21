@@ -14,6 +14,7 @@ import {
   consumeOAuthAttempt,
   hasLiveSession,
   peekOAuthAttempt,
+  readOAuthReturn,
   startGoogleSignIn,
 } from "./googleOAuth";
 
@@ -93,11 +94,16 @@ export function GoogleCallbackHandler({ next }: { next?: string }) {
   // Peek once (non-destructive, StrictMode-safe): did THIS tab recently
   // leave for Google? The effect consumes the flag when it acts on it.
   const [attempted] = useState(peekOAuthAttempt);
+  // Capture the OAuth return params at mount (non-destructive read). With
+  // auto-detect off, a fresh return carries ?insforge_code= but no session
+  // yet — that combination is exactly what must trigger completion.
+  const [returned] = useState(readOAuthReturn);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      if (!(await hasLiveSession())) {
+      const session = await hasLiveSession();
+      if (!session && !returned.code && !returned.error) {
         if (!cancelled && attempted) {
           consumeOAuthAttempt();
           setError("Google sign-in didn't complete — no session was established. Try again.");

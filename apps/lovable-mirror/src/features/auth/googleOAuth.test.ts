@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  exchangeErrorMessage,
   isFreshOAuthAttempt,
   OAUTH_ATTEMPT_TTL_MS,
   oauthStartMessage,
+  parseOAuthReturn,
 } from "./googleOAuth";
 
 // Guards the "never a silent sit on the sign-in page" invariant: the OAuth
@@ -36,6 +38,45 @@ describe("isFreshOAuthAttempt", () => {
   });
 });
 
+describe("parseOAuthReturn", () => {
+  it("reads code and error params", () => {
+    expect(parseOAuthReturn("?insforge_code=abc123")).toEqual({ code: "abc123", error: null });
+    expect(parseOAuthReturn("?error=access_denied")).toEqual({ code: null, error: "access_denied" });
+  });
+
+  it("returns empty for plain sign-in visits", () => {
+    expect(parseOAuthReturn("")).toEqual({ code: null, error: null });
+    expect(parseOAuthReturn("?next=%2Fdesk")).toEqual({ code: null, error: null });
+  });
+
+  it("trims blanks and survives garbage", () => {
+    expect(parseOAuthReturn("?insforge_code=%20%20")).toEqual({ code: null, error: null });
+    expect(parseOAuthReturn("%%%")).toEqual({ code: null, error: null });
+  });
+});
+
+describe("exchangeErrorMessage", () => {
+  it("explains a lost PKCE verifier", () => {
+    expect(exchangeErrorMessage({ error: "PKCE_VERIFIER_MISSING", message: "x", statusCode: 400 })).toContain(
+      "expired before completing",
+    );
+  });
+
+  it("surfaces backend message plus guidance", () => {
+    const message = exchangeErrorMessage({
+      message: "Invalid code",
+      statusCode: 400,
+      error: "INVALID_CODE",
+      nextActions: "Start again.",
+    });
+    expect(message).toContain("Invalid code");
+    expect(message).toContain("Start again.");
+  });
+
+  it("falls back when empty", () => {
+    expect(exchangeErrorMessage(null)).toBe("Google sign-in didn't complete. Try again.");
+  });
+});
 describe("oauthStartMessage", () => {
   it("falls back when the error carries nothing useful", () => {
     expect(oauthStartMessage(null)).toBe("Couldn't start Google sign-in. Try again.");
