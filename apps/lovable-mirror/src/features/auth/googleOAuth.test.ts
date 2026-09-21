@@ -6,6 +6,7 @@ import {
   OAUTH_ATTEMPT_TTL_MS,
   oauthStartMessage,
   parseOAuthReturn,
+  shouldShowOAuthLoader,
 } from "./googleOAuth";
 
 // Guards the "never a silent sit on the sign-in page" invariant: the OAuth
@@ -55,6 +56,22 @@ describe("parseOAuthReturn", () => {
   });
 });
 
+describe("shouldShowOAuthLoader", () => {
+  it("shows takeover for an OAuth return even without a flag", () => {
+    expect(shouldShowOAuthLoader("?insforge_code=abc", false)).toBe(true);
+    expect(shouldShowOAuthLoader("?error=access_denied", false)).toBe(true);
+  });
+
+  it("shows takeover for a fresh attempt even after params are stripped", () => {
+    expect(shouldShowOAuthLoader("", true)).toBe(true);
+    expect(shouldShowOAuthLoader("?next=%2Fdesk", true)).toBe(true);
+  });
+
+  it("shows the plain form for normal visits", () => {
+    expect(shouldShowOAuthLoader("", false)).toBe(false);
+    expect(shouldShowOAuthLoader("?next=%2Fdesk", false)).toBe(false);
+  });
+});
 describe("exchangeErrorMessage", () => {
   it("explains a lost PKCE verifier", () => {
     expect(exchangeErrorMessage({ error: "PKCE_VERIFIER_MISSING", message: "x", statusCode: 400 })).toContain(

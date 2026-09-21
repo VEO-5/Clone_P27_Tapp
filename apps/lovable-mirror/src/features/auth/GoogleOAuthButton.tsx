@@ -86,7 +86,13 @@ export function GoogleOAuthButton({ next }: { next?: string }) {
  * session means the return died (exchange failed, wrong tab, storage off) —
  * that must surface an error, never a silent sit on the sign-in page.
  */
-export function GoogleCallbackHandler({ next }: { next?: string }) {
+export function GoogleCallbackHandler({
+  next,
+  onSettled,
+}: {
+  next?: string;
+  onSettled?: (ok: boolean, message?: string) => void;
+}) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
@@ -106,7 +112,9 @@ export function GoogleCallbackHandler({ next }: { next?: string }) {
       if (!session && !returned.code && !returned.error) {
         if (!cancelled && attempted) {
           consumeOAuthAttempt();
-          setError("Google sign-in didn't complete — no session was established. Try again.");
+          const message = "Google sign-in didn't complete — no session was established. Try again.";
+          setError(message);
+          onSettled?.(false, message);
         }
         return;
       }
@@ -120,8 +128,11 @@ export function GoogleCallbackHandler({ next }: { next?: string }) {
         navigate({ to: landingTarget(next, landing) });
       } catch (cause: unknown) {
         if (!cancelled) {
-          setError(cause instanceof Error ? cause.message : "Google sign-in didn't complete. Try again.");
+          const message =
+            cause instanceof Error ? cause.message : "Google sign-in didn't complete. Try again.";
+          setError(message);
           setCompleting(false);
+          onSettled?.(false, message);
         }
       }
     })();

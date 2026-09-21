@@ -195,6 +195,18 @@ export function readOAuthReturn(): OAuthReturn {
 }
 
 /**
+ * Should /sign-in render the OAuth loading takeover instead of the form?
+ * Pure (exported for unit tests): true when the URL carries a return OR this
+ * tab recently left for Google. Synchronous so the route decides at mount
+ * with zero form-flash.
+ */
+export function shouldShowOAuthLoader(search: string, attempted: boolean): boolean {
+  if (attempted) return true;
+  const { code, error } = parseOAuthReturn(search);
+  return Boolean(code || error);
+}
+
+/**
  * Map an exchange failure to a user-facing message (pure, tested).
  * InsForgeError carries { message, statusCode, error, nextActions }.
  */
