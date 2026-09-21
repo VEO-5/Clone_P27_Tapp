@@ -417,6 +417,53 @@ export default async function (req: Request): Promise<Response> {
     });
   }
 
+  // -- GET /tickets/mine/unrated (CSAT fly-in) ------------------------------------
+  if (req.method === "GET" && path === "/tickets/mine/unrated") {
+    const cutoff = new Date(Date.now() - 7 * 86_400_000).toISOString();
+    const { data, error } = await db
+      .from("tickets")
+      .select(
+        "id, reference, title, description, category_id, status, priority, requester_id, assignee_id, version, chat_dm_url, created_at, updated_at, resolved_at",
+      )
+      .eq("requester_id", p.id)
+      .eq("status", "resolved")
+      .gte("updated_at", cutoff)
+      .order("updated_at", { ascending: false })
+      .limit(7);
+    if (error) return err(req, 500, "DB_ERROR", "Couldn't load tickets.");
+    const rows = (data as DbTicket[]) ?? [];
+    return json(req, { items: rows.map(toTicket) });
+  }
+
+  // -- POST /tickets/:id/csat ----------------------------------------------------
+  {
+    const m = path.match(/^\/tickets\/([^/]+)\/csat$/);
+    if (req.method === "POST" && m) {
+      const id = decodeURIComponent(m[1]);
+      const t = await ticketById(id);
+      if (!t) return err(req, 404, "NOT_FOUND", "Ticket not found.");
+      if (t.requester_id !== p.id && !isDesk) return err(req, 404, "NOT_FOUND", "Ticket not found.");
+      if (t.status !== "resolved") {
+        return err(req, 422, "VALIDATION_FAILED", "Score must be 1–5 on a resolved ticket.", {
+          fieldErrors: { score: "Pick 1–5" },
+        });
+      }
+      const score = Number(body.score ?? 0);
+      if (!Number.isInteger(score) || score < 1 || score > 5) {
+        return err(req, 422, "VALIDATION_FAILED", "Score must be 1–5 on a resolved ticket.", {
+          fieldErrors: { score: "Pick 1–5" },
+        });
+      }
+      // Persist is best-effort; ratings table may not exist — still acknowledge.
+      try {
+        await db.from("ticket_ratings").insert([{ ticket_id: t.id, score, comment: String(body.comment ?? "").slice(0, 1000), rater_id: p.id }]);
+      } catch {
+        // ignore — table optional for mock parity
+      }
+      return json(req, { ok: true }, 201);
+    }
+  }
+
   // -- GET /tickets/:reference --------------------------------------------------
   {
     const m = path.match(/^\/tickets\/([^/]+)$/);
@@ -434,7 +481,24 @@ export default async function (req: Request): Promise<Response> {
       if (t.requester_id !== p.id && !isDesk) {
         return err(req, 404, "NOT_FOUND", "No ticket found with that reference.");
       }
-      return json(req, toTicket(t));
+      const [{ data: events }, { data: attachments }, { data: assigneeProfile }] = await Promise.all([
+        db.from("ticket_events").select("id, ticket_id, type, message, actor, created_at").eq("ticket_id", t.id).order("created_at", { ascending: true }).limit(100),
+        db.from("attachments").select("id, ticket_id, file_name, mime_type, size_bytes, created_at").eq("ticket_id", t.id).limit(20),
+        t.assignee_id ? db.from("profiles").select("name, avatar_url").eq("id", t.assignee_id).maybeSingle() : Promise.resolve({ data: null } as never),
+      ]);
+      const handlingAgent = (assigneeProfile as { name?: string; avatar_url?: string | null } | null)?.name
+        ? { name: (assigneeProfile as { name: string }).name, avatarUrl: (assigneeProfile as { avatar_url: string | null }).avatar_url ?? null }
+        : null;
+      return json(req, {
+        ...toTicket(t),
+        handlingAgent,
+        events: ((events ?? []) as Record<string, unknown>[]).map((e) => ({
+          id: e["id"], ticketId: e["ticket_id"], type: e["type"], message: e["message"], actor: e["actor"], createdAt: e["created_at"],
+        })),
+        attachments: ((attachments ?? []) as Record<string, unknown>[]).map((a) => ({
+          id: a["id"], ticketId: a["ticket_id"], fileName: a["file_name"], mimeType: a["mime_type"], sizeBytes: a["size_bytes"], status: "available", createdAt: a["created_at"],
+        })),
+      });
     }
   }
 

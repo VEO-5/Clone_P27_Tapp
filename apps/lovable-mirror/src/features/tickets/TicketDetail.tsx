@@ -32,6 +32,7 @@ export function TicketDetail({ reference }: { reference: string }) {
   const unrated = useQuery({
     queryKey: ["tickets", "mine", "unrated"],
     queryFn: () => apiFetch<{ items: Ticket[] }>("/tickets/mine/unrated"),
+    retry: false,
   });
   // Hook first (before the early returns below): "" resolves to "" and is
   // discarded on the loading/error branches.
@@ -83,8 +84,8 @@ export function TicketDetail({ reference }: { reference: string }) {
     );
   }
 
-  const ticket = detail.data;
-  const showCsat = unrated.data?.items.some((t) => t.id === ticket.id) ?? false;
+  const ticket = detail.data as Detail & { handlingAgent?: { name: string } | null };
+  const showCsat = (unrated.data?.items ?? []).some((t) => t.id === ticket.id);
 
   return (
     <div className="mx-auto max-w-3xl px-4 pb-8 pt-10 sm:px-6 sm:pt-14">
@@ -138,12 +139,12 @@ export function TicketDetail({ reference }: { reference: string }) {
 
           <section>
             <p className="eyebrow mb-3">Attachments</p>
-            <AttachmentList attachments={ticket.attachments} />
+            <AttachmentList attachments={(ticket as unknown as { attachments?: Attachment[] }).attachments ?? []} />
           </section>
 
           <section>
             <p className="eyebrow mb-4">Updates</p>
-            <StatusTimeline events={ticket.events} />
+            <StatusTimeline events={(ticket as unknown as { events?: TicketEvent[] }).events ?? []} />
           </section>
 
           {showCsat && (

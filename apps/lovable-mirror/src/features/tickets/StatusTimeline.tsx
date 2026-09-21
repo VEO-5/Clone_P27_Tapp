@@ -15,8 +15,8 @@ function actorLabel(actor?: string): "You" | "Support" | "System" {
  * Employee status timeline: status events only, chronological (FE-2.18).
  * Messages, internal notes, assignments, and releases never render here.
  */
-export function StatusTimeline({ events }: { events: TicketEvent[] }) {
-  const visible = events
+export function StatusTimeline({ events }: { events?: TicketEvent[] | null }) {
+  const visible = (events ?? [])
     .filter((event) => STATUS_TYPES.has(event.type))
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
     .map(

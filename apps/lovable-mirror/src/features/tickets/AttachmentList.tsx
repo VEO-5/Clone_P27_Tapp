@@ -8,7 +8,8 @@ import { apiFetch } from "@/lib/api";
 import { formatBytes } from "@/lib/utils";
 
 /** Attachments open via short-lived URLs — never a stored URL (FE-2.13). */
-export function AttachmentList({ attachments }: { attachments: Attachment[] }) {
+export function AttachmentList({ attachments }: { attachments?: Attachment[] | null }) {
+  const list = attachments ?? [];
   const [opening, setOpening] = useState<string | null>(null);
 
   async function open(attachment: Attachment) {
@@ -24,13 +25,13 @@ export function AttachmentList({ attachments }: { attachments: Attachment[] }) {
     }
   }
 
-  if (attachments.length === 0) {
+  if (list.length === 0) {
     return <p className="text-sm text-fog">No files were attached to this ticket.</p>;
   }
 
   return (
     <ul className="flex flex-col gap-2">
-      {attachments.map((file) => {
+      {list.map((file) => {
         const isImage = file.mimeType.startsWith("image/");
         const busy = opening === file.id;
         return (

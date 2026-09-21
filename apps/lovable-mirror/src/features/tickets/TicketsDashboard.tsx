@@ -47,6 +47,7 @@ export default function TicketsDashboard() {
   const unrated = useQuery({
     queryKey: ["tickets", "mine", "unrated"],
     queryFn: () => apiFetch<{ items: Ticket[] }>("/tickets/mine/unrated"),
+    retry: false,
   });
 
   const counts = mine.data?.counts ?? { pending: 0, open: 0, inProgress: 0, resolved: 0 };
