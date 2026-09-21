@@ -9,7 +9,13 @@ import { Button } from "@/components/shadcn/button";
 import { queryKeys } from "@/lib/query";
 
 import { landingTarget } from "./mockSession";
-import { completeGoogleSignIn, hasLiveSession, startGoogleSignIn } from "./googleOAuth";
+import {
+  completeGoogleSignIn,
+  consumeOAuthAttempt,
+  hasLiveSession,
+  peekOAuthAttempt,
+  startGoogleSignIn,
+} from "./googleOAuth";
 
 function GoogleMark() {
   return (
@@ -75,18 +81,30 @@ export function GoogleOAuthButton({ next }: { next?: string }) {
  * Must NOT gate on `?insforge_code=` in the URL: the SDK strips that param
  * synchronously at import time and exchanges it in the background, so by
  * mount time it is always gone. Instead: settle, check for a session token,
- * and only then resolve the role + navigate. No token = plain sign-in page.
+ * and only then resolve the role + navigate. A fresh OAuth attempt with no
+ * session means the return died (exchange failed, wrong tab, storage off) —
+ * that must surface an error, never a silent sit on the sign-in page.
  */
 export function GoogleCallbackHandler({ next }: { next?: string }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
   const [completing, setCompleting] = useState(false);
+  // Peek once (non-destructive, StrictMode-safe): did THIS tab recently
+  // leave for Google? The effect consumes the flag when it acts on it.
+  const [attempted] = useState(peekOAuthAttempt);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      if (!(await hasLiveSession())) return;
+      if (!(await hasLiveSession())) {
+        if (!cancelled && attempted) {
+          consumeOAuthAttempt();
+          setError("Google sign-in didn't complete — no session was established. Try again.");
+        }
+        return;
+      }
+      consumeOAuthAttempt();
       if (!cancelled) setCompleting(true);
       try {
         const { landing, profile } = await completeGoogleSignIn();

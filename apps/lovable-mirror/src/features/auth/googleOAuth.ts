@@ -18,6 +18,7 @@ function googleRedirectTarget(): string {
 
 /** Step 1: leave for Google. Returns when the redirect starts. */
 export async function startGoogleSignIn(): Promise<void> {
+  recordOAuthAttempt();
   const { error } = await insforge.auth.signInWithOAuth("google", {
     redirectTo: googleRedirectTarget(),
     // Provider-specific hints only (server owns client_id/scope/pkcs/state).
@@ -25,7 +26,100 @@ export async function startGoogleSignIn(): Promise<void> {
     // domain check below remains authoritative.
     additionalParams: { hd: "pearl27.com", prompt: "select_account" },
   });
-  if (error) throw new Error(error.message || "Couldn't start Google sign-in. Try again.");
+  if (error) {
+    // The redirect never started — clear the attempt flag and surface the
+    // backend guidance (e.g. a rejected redirect URL tells us to allowlist).
+    consumeOAuthAttempt();
+    throw new Error(oauthStartMessage(error));
+  }
+}
+
+/**
+ * Human-readable message for a failed OAuth start. InsForgeError carries
+ * machine fields (statusCode/nextActions) — the 400 case for a rejected
+ * redirect URL is self-diagnosing when nextActions is included.
+ */
+export function oauthStartMessage(error: unknown): string {
+  const details = (error ?? {}) as {
+    message?: unknown;
+    statusCode?: unknown;
+    nextActions?: unknown;
+  };
+  const message =
+    typeof details.message === "string" && details.message
+      ? details.message
+      : "Couldn't start Google sign-in. Try again.";
+  const hint =
+    details.statusCode === 400 && typeof details.nextActions === "string" && details.nextActions
+      ? ` ${details.nextActions}`
+      : "";
+  return `${message}${hint}`;
+}
+
+// ---------------------------------------------------------------------------
+// OAuth-attempt tracking: makes a dead return from Google visible instead of
+// a silent sit on the sign-in page.
+// ---------------------------------------------------------------------------
+
+/** sessionStorage key marking a Google redirect started from this tab. */
+export const OAUTH_ATTEMPT_KEY = "p27_oauth_attempt";
+/** Attempts older than this are stale (user abandoned the flow). */
+export const OAUTH_ATTEMPT_TTL_MS = 15 * 60 * 1000;
+
+function attemptStorage(): Storage | null {
+  try {
+    if (typeof window === "undefined") return null;
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Pure freshness check over a stored timestamp (exported for unit tests).
+ * Tolerates minor clock skew; rejects missing/garbage/far-future values.
+ */
+export function isFreshOAuthAttempt(stored: string | null, now: number = Date.now()): boolean {
+  if (!stored) return false;
+  const started = Number(stored);
+  if (!Number.isFinite(started) || started <= 0) return false;
+  const age = now - started;
+  return age > -60_000 && age < OAUTH_ATTEMPT_TTL_MS;
+}
+
+/** Mark that this tab is leaving for Google (cleared on return). */
+export function recordOAuthAttempt(): void {
+  try {
+    attemptStorage()?.setItem(OAUTH_ATTEMPT_KEY, String(Date.now()));
+  } catch {
+    // Tracking is diagnostic-only; never break sign-in when storage is off.
+  }
+}
+
+/**
+ * Peek the attempt flag without clearing (StrictMode-safe for render-time
+ * reads; the effect consumes once it acts on the value).
+ */
+export function peekOAuthAttempt(): boolean {
+  try {
+    return isFreshOAuthAttempt(attemptStorage()?.getItem(OAUTH_ATTEMPT_KEY) ?? null);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Consume the attempt flag: returns true when this tab recently left for
+ * Google. Always clears, so a stale flag can never cry wolf twice.
+ */
+export function consumeOAuthAttempt(): boolean {
+  try {
+    const fresh = peekOAuthAttempt();
+    attemptStorage()?.removeItem(OAUTH_ATTEMPT_KEY);
+    return fresh;
+  } catch {
+    return false;
+  }
 }
 
 /** True when the SDK currently holds a usable access token (same check liveFetch uses). */
