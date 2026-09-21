@@ -27,7 +27,7 @@ export const Route = createFileRoute("/sign-in")({
             description={
               mock
                 ? "Use your Pearl 27 work email — we recognize your role. Admins invite agents and admins; everyone else signs in as an employee, no account needed."
-                : "One click with your Pearl 27 Google account — or we'll send your work email a 6-digit code. No password needed."
+                : undefined
             }
           />
           <div className="flex flex-col gap-4 p-6 sm:p-8">
@@ -42,10 +42,6 @@ export const Route = createFileRoute("/sign-in")({
             )}
             <EmailSignInForm next={next ?? "/"} />
             {mock && <MockSignInButtons next={next ?? "/"} />}
-            <p className="text-[13px] leading-relaxed text-fog">
-              After sign-in, you land on your home: employees on My tickets, agents on the Desk,
-              admins on the Dashboard.
-            </p>
             {mock && <DemoResetButton />}
           </div>
         </Panel>

@@ -242,11 +242,37 @@ export default async function (req: Request): Promise<Response> {
     }
     const name =
       String(user!.profile?.["name"] ?? "") || email.split("@")[0];
+    // Straight-to-Desk: an admin invite stored in role_invites claims the
+    // invited role on first login (single-use). No invite -> employee.
+    // Invite lookup failure must never block sign-in -> fall back to employee.
+    let firstRole: DbProfile["role"] = "employee";
+    try {
+      const { data: invite } = await db
+        .from("role_invites")
+        .select("role")
+        .eq("email", email)
+        .maybeSingle();
+      const invitedRole = (invite as { role?: string } | null)?.role;
+      if (invitedRole === "agent" || invitedRole === "admin") {
+        firstRole = invitedRole;
+      }
+    } catch {
+      firstRole = "employee";
+    }
     const { data: created } = await db
       .from("profiles")
-      .insert([{ id: user!.id, email, name, role: "employee" }])
+      .insert([{ id: user!.id, email, name, role: firstRole }])
       .select("id, email, name, avatar_url, role, team_id")
       .single();
+    if (created && firstRole !== "employee") {
+      // Best-effort single-use claim; a leftover row would re-apply on
+      // re-provision only, and profile exists now so it is harmless anyway.
+      try {
+        await db.from("role_invites").delete().eq("email", email);
+      } catch {
+        // ignore — invite cleanup is cosmetic once the profile exists.
+      }
+    }
     return (created as DbProfile) ?? null;
   }
 
@@ -1004,7 +1030,7 @@ export default async function (req: Request): Promise<Response> {
     for (const t of ((openTickets ?? []) as { assignee_id: string | null }[])) {
       if (t.assignee_id) openByAssignee.set(t.assignee_id, (openByAssignee.get(t.assignee_id) ?? 0) + 1);
     }
-    return ((people ?? []) as {
+    const active = ((people ?? []) as {
       id: string; email: string; name: string; avatar_url: string | null; role: string; team_id: string | null;
     }[]).map((x) => ({
       id: x.id,
@@ -1017,6 +1043,36 @@ export default async function (req: Request): Promise<Response> {
       openTickets: openByAssignee.get(x.id) ?? 0,
       lastSeen: null as string | null,
     }));
+    // Pending invites (not yet signed in) show as Invited rows, mirroring mock.
+    // Best-effort: a failed invite read must not break the directory.
+    try {
+      const { data: invites } = await db
+        .from("role_invites")
+        .select("email, role, created_at")
+        .eq("role", role)
+        .order("created_at", { ascending: false })
+        .limit(200);
+      const activeEmails = new Set(active.map((a) => a.email.toLowerCase()));
+      const pending = ((invites ?? []) as { email: string; role: string; created_at: string }[])
+        .filter((inv) => !activeEmails.has(String(inv.email).toLowerCase()))
+        .map((inv) => {
+          const invEmail = String(inv.email).toLowerCase();
+          return {
+            id: `invite:${invEmail}`,
+            email: invEmail,
+            name: invEmail.split("@")[0] ?? invEmail,
+            avatarUrl: null as string | null,
+            role,
+            teamId: "support",
+            status: "invited" as const,
+            openTickets: 0,
+            lastSeen: null as string | null,
+          };
+        });
+      return [...active, ...pending];
+    } catch {
+      return active;
+    }
   }
 
   if (req.method === "GET" && path === "/admin/admins") {
@@ -1033,11 +1089,70 @@ export default async function (req: Request): Promise<Response> {
     return json(req, rows);
   }
 
-  // Invites mint real logins — creating auth users from here needs a product
-  // decision (email delivery, first-sign-in claim). Honest 501 until then.
+  // Invites are email-keyed rows in role_invites, claimed on first login
+  // (see profile()). No auth user exists yet, so nothing else is minted here.
+  // Email delivery is manual for now (Resend paused) — the invite still takes
+  // effect: first sign-in lands straight on the Desk, no employee detour.
   if (req.method === "POST" && (path === "/admin/admins" || path === "/admin/agents")) {
     if (!isAdmin) return FORBIDDEN(req);
-    return err(req, 501, "NOT_SUPPORTED", "Invites aren't available on this backend yet.");
+    const kind = path === "/admin/admins" ? ("admin" as const) : ("agent" as const);
+    const rawEmail = String(body.email ?? "").trim().toLowerCase();
+    if (!rawEmail.includes("@") || !rawEmail.endsWith("@pearl27.com")) {
+      return err(req, 422, "VALIDATION_FAILED", "Check the highlighted fields.", {
+        fieldErrors: { email: "Use your pearl27.com address" },
+      });
+    }
+    // Already signed in before? Elevate the existing profile immediately so
+    // the next /auth/me (or refresh) carries the desk role — no re-invite loop.
+    const { data: existing } = await db
+      .from("profiles")
+      .select("id, email, name, avatar_url, role, team_id")
+      .eq("email", rawEmail)
+      .maybeSingle();
+    const person = existing as {
+      id: string; email: string; name: string; avatar_url: string | null; role: string; team_id: string | null;
+    } | null;
+    if (person) {
+      if (person.role !== kind) {
+        const { error: promoteError } = await db
+          .from("profiles")
+          .update({ role: kind })
+          .eq("id", person.id);
+        if (promoteError) return err(req, 500, "DB_ERROR", "Couldn't save this invite.");
+      }
+      try {
+        await db.from("role_invites").delete().eq("email", rawEmail);
+      } catch {
+        // ignore — cleanup only.
+      }
+      return json(req, {
+        id: person.id,
+        email: person.email,
+        name: person.name,
+        avatarUrl: person.avatar_url,
+        role: kind,
+        teamId: person.team_id ?? "support",
+        status: "active",
+        openTickets: 0,
+        lastSeen: null,
+      }, 201);
+    }
+    // Never signed in: upsert a pending invite (idempotent re-invite).
+    const { error: inviteError } = await db
+      .from("role_invites")
+      .upsert([{ email: rawEmail, role: kind, invited_by: p.id }], { onConflict: "email" });
+    if (inviteError) return err(req, 500, "DB_ERROR", "Couldn't save this invite.");
+    return json(req, {
+      id: `invite:${rawEmail}`,
+      email: rawEmail,
+      name: rawEmail.split("@")[0] ?? rawEmail,
+      avatarUrl: null,
+      role: kind,
+      teamId: "support",
+      status: "invited",
+      openTickets: 0,
+      lastSeen: null,
+    }, 201);
   }
 
   {
@@ -1050,6 +1165,30 @@ export default async function (req: Request): Promise<Response> {
       if (!isAdmin) return FORBIDDEN(req);
       const kind = m[2] === "admins" ? ("admin" as const) : ("agent" as const);
       const id = decodeURIComponent(m[3]);
+      // Revoke a pending invite (never signed in): row id is `invite:<email>`.
+      // Returns a deactivated-shaped row so the directory UI marks it done;
+      // re-inviting later is a clean upsert.
+      if (id.startsWith("invite:")) {
+        const invEmail = id.slice("invite:".length).trim().toLowerCase();
+        const { data: inv } = await db
+          .from("role_invites")
+          .select("email, role")
+          .eq("email", invEmail)
+          .eq("role", kind)
+          .maybeSingle();
+        if (!inv) {
+          return err(req, 404, "NOT_FOUND", kind === "admin" ? "Admin not found" : "Agent not found");
+        }
+        const { error: revokeError } = await db
+          .from("role_invites")
+          .delete()
+          .eq("email", invEmail);
+        if (revokeError) return err(req, 500, "DB_ERROR", "Couldn't deactivate this account.");
+        return json(req, {
+          id, email: invEmail, name: invEmail.split("@")[0] ?? invEmail, avatarUrl: null,
+          role: kind, teamId: "support", status: "deactivated", openTickets: 0, lastSeen: null,
+        });
+      }
       const { data: target } = await db
         .from("profiles")
         .select("id, email, name, avatar_url, role, team_id")
@@ -1073,6 +1212,13 @@ export default async function (req: Request): Promise<Response> {
       }
       const { error } = await db.from("profiles").update({ role: "employee" }).eq("id", person.id);
       if (error) return err(req, 500, "DB_ERROR", "Couldn't deactivate this account.");
+      // Clear any stale pending invite for the same email so a demoted user
+      // doesn't snap back to a desk role on re-provision.
+      try {
+        await db.from("role_invites").delete().eq("email", String(person.email).toLowerCase());
+      } catch {
+        // ignore — cleanup only.
+      }
       return json(req, {
         id: person.id, email: person.email, name: person.name, avatarUrl: person.avatar_url,
         role: person.role, teamId: person.team_id, status: "deactivated", openTickets: 0, lastSeen: null,

@@ -45,12 +45,14 @@ export function SiteHeader({
   employeeEmail,
   role = "signedOut",
   action,
+  hideNav = false,
 }: {
   employeeEmail?: string | null;
   /** Accepted for signature parity; the dicebear avatar lands on arrival. */
   employeeAvatarUrl?: string | null;
   role?: keyof typeof NAV_BY_ROLE;
   action?: React.ReactNode;
+  hideNav?: boolean;
 }) {
   const pathname = useLocation().pathname;
   const NAV = NAV_BY_ROLE[role];
@@ -79,41 +81,43 @@ export function SiteHeader({
         </Link>
 
         <div className="flex items-center gap-6">
-          <nav aria-label="Primary" className="flex items-center gap-6">
-            {NAV.map((item) =>
-              item.to === "/tickets/new" ? (
-                <button
-                  key={item.to}
-                  type="button"
-                  onClick={() => setReportOpen(true)}
-                  className="group relative cursor-pointer py-1 font-display text-[13px] text-mist transition-colors hover:text-pearl"
-                >
-                  <span className="hidden sm:inline">{item.label}</span>
-                  <span className="sm:hidden">{item.label.split(" ")[0]}</span>
-                  <span className="absolute -bottom-1 left-0 h-0.5 w-0 bg-iris-500 transition-all duration-200 group-hover:w-full" />
-                </button>
-              ) : (
-                <Link
-                  key={item.to}
-                  to={item.to}
-                  aria-current={isActive(item.to) ? "page" : undefined}
-                  className={cn(
-                    "group relative py-1 font-display text-[13px] transition-colors",
-                    isActive(item.to) ? "text-pearl" : "text-mist hover:text-pearl",
-                  )}
-                >
-                  <span className="hidden sm:inline">{item.label}</span>
-                  <span className="sm:hidden">{item.label.split(" ")[0]}</span>
-                  <span
+          {!hideNav && (
+            <nav aria-label="Primary" className="flex items-center gap-6">
+              {NAV.map((item) =>
+                item.to === "/tickets/new" ? (
+                  <button
+                    key={item.to}
+                    type="button"
+                    onClick={() => setReportOpen(true)}
+                    className="group relative cursor-pointer py-1 font-display text-[13px] text-mist transition-colors hover:text-pearl"
+                  >
+                    <span className="hidden sm:inline">{item.label}</span>
+                    <span className="sm:hidden">{item.label.split(" ")[0]}</span>
+                    <span className="absolute -bottom-1 left-0 h-0.5 w-0 bg-iris-500 transition-all duration-200 group-hover:w-full" />
+                  </button>
+                ) : (
+                  <Link
+                    key={item.to}
+                    to={item.to}
+                    aria-current={isActive(item.to) ? "page" : undefined}
                     className={cn(
-                      "absolute -bottom-1 left-0 h-0.5 bg-iris-500 transition-all duration-200",
-                      isActive(item.to) ? "w-full" : "w-0 group-hover:w-full",
+                      "group relative py-1 font-display text-[13px] transition-colors",
+                      isActive(item.to) ? "text-pearl" : "text-mist hover:text-pearl",
                     )}
-                  />
-                </Link>
-              ),
-            )}
-          </nav>
+                  >
+                    <span className="hidden sm:inline">{item.label}</span>
+                    <span className="sm:hidden">{item.label.split(" ")[0]}</span>
+                    <span
+                      className={cn(
+                        "absolute -bottom-1 left-0 h-0.5 bg-iris-500 transition-all duration-200",
+                        isActive(item.to) ? "w-full" : "w-0 group-hover:w-full",
+                      )}
+                    />
+                  </Link>
+                ),
+              )}
+            </nav>
+          )}
           <ReportIssueSheet open={reportOpen} onOpenChange={setReportOpen} />
 
           {employeeEmail && (

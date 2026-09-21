@@ -14,7 +14,7 @@ export function SessionHeader() {
   // cache flips before navigation lands, and without this guard the new
   // profile + Sign out flash over the sign-in card for a beat.
   if (pathname === "/sign-in" || pathname.startsWith("/auth/")) {
-    return <SiteHeader role="signedOut" />;
+    return <SiteHeader role="signedOut" hideNav />;
   }
   return (
     <SiteHeader

@@ -9,7 +9,7 @@ import { Button } from "@/components/shadcn/button";
 import { queryKeys } from "@/lib/query";
 
 import { landingTarget } from "./mockSession";
-import { completeGoogleSignIn, hasOAuthCode, startGoogleSignIn } from "./googleOAuth";
+import { completeGoogleSignIn, hasLiveSession, startGoogleSignIn } from "./googleOAuth";
 
 function GoogleMark() {
   return (
@@ -70,38 +70,43 @@ export function GoogleOAuthButton({ next }: { next?: string }) {
 }
 
 /**
- * Runs once when Google redirects back with `?insforge_code=…`.
- * Resolves the session + role, then lands like every other sign-in.
+ * Completes Google sign-in after the redirect back to `/sign-in`.
+ *
+ * Must NOT gate on `?insforge_code=` in the URL: the SDK strips that param
+ * synchronously at import time and exchanges it in the background, so by
+ * mount time it is always gone. Instead: settle, check for a session token,
+ * and only then resolve the role + navigate. No token = plain sign-in page.
  */
 export function GoogleCallbackHandler({ next }: { next?: string }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState(!hasOAuthCode());
+  const [completing, setCompleting] = useState(false);
 
   useEffect(() => {
-    if (done) return;
     let cancelled = false;
-    completeGoogleSignIn()
-      .then(({ landing, profile }) => {
+    (async () => {
+      if (!(await hasLiveSession())) return;
+      if (!cancelled) setCompleting(true);
+      try {
+        const { landing, profile } = await completeGoogleSignIn();
         if (cancelled) return;
         if (profile) queryClient.setQueryData(queryKeys.me, profile);
         else void queryClient.invalidateQueries({ queryKey: queryKeys.me });
         navigate({ to: landingTarget(next, landing) });
-      })
-      .catch((cause: unknown) => {
+      } catch (cause: unknown) {
         if (!cancelled) {
           setError(cause instanceof Error ? cause.message : "Google sign-in didn't complete. Try again.");
-          setDone(true);
+          setCompleting(false);
         }
-      });
+      }
+    })();
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (done && !error) return null;
   if (error) {
     return (
       <p role="alert" className="text-[13px] text-rose-600">
@@ -112,9 +117,12 @@ export function GoogleCallbackHandler({ next }: { next?: string }) {
       </p>
     );
   }
-  return (
-    <p role="status" className="flex items-center gap-2 text-[13px] text-mist">
-      <Loader2 className="animate-spin" aria-hidden /> Completing Google sign-in…
-    </p>
-  );
+  if (completing) {
+    return (
+      <p role="status" className="flex items-center gap-2 text-[13px] text-mist">
+        <Loader2 className="animate-spin" aria-hidden /> Completing Google sign-in…
+      </p>
+    );
+  }
+  return null;
 }
