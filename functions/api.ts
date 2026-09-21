@@ -550,7 +550,7 @@ export default async function (req: Request): Promise<Response> {
           db.from("attachments").select("id, ticket_id, file_name, mime_type, size_bytes, created_at").eq("ticket_id", t.id).limit(20),
         ]);
       return json(req, {
-        ...toTicket(t),
+        ticket: toTicket(t),
         events: ((events ?? []) as Record<string, unknown>[]).map((e) => ({
           id: e["id"], ticketId: e["ticket_id"], type: e["type"], message: e["message"], actor: e["actor"], createdAt: e["created_at"],
         })),
@@ -560,6 +560,7 @@ export default async function (req: Request): Promise<Response> {
         attachments: ((attachments ?? []) as Record<string, unknown>[]).map((a) => ({
           id: a["id"], ticketId: a["ticket_id"], fileName: a["file_name"], mimeType: a["mime_type"], sizeBytes: a["size_bytes"], createdAt: a["created_at"],
         })),
+        justOpened: false,
       });
     }
   }

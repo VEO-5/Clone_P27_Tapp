@@ -83,7 +83,12 @@ export function ReplyScreen({ id }: { id: string }) {
   });
   // Hook first (before the early returns below): "" resolves to "" and is
   // discarded on the loading/error branches.
-  const resolvedCategoryName = useCategoryName(detail.data?.ticket.categoryId ?? "");
+  // Defensive: API was flat {...ticket, events} vs Detail {ticket, events} — support both.
+  const rawCategoryId =
+    (detail.data as unknown as { ticket?: { categoryId?: string }; categoryId?: string } | null)?.ticket?.categoryId ??
+    (detail.data as unknown as { categoryId?: string } | null)?.categoryId ??
+    "";
+  const resolvedCategoryName = useCategoryName(rawCategoryId);
 
   if (detail.isPending) {
     return (
@@ -115,7 +120,33 @@ export function ReplyScreen({ id }: { id: string }) {
     );
   }
 
-  const { ticket, events, messages, attachments } = detail.data;
+  // Normalize: support wrapped Detail {ticket} (mock + fixed prod) and legacy flat prod.
+  const rawDetail = detail.data as unknown as Detail & Record<string, unknown>;
+  const ticket = (rawDetail as unknown as { ticket?: DeskTicket })?.ticket ?? (rawDetail as unknown as DeskTicket);
+  const events = (rawDetail as unknown as { events?: TicketEvent[] })?.events ?? [];
+  const messages = (rawDetail as unknown as { messages?: Message[] })?.messages ?? [];
+  const attachments = (rawDetail as unknown as { attachments?: Attachment[] })?.attachments ?? [];
+
+  if (!ticket || !ticket.id) {
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-20 sm:px-6">
+        <Panel tone="night">
+          <EmptyState
+            tone="night"
+            icon={<SearchX className="size-5" aria-hidden />}
+            title="Ticket not found"
+            description="It may have been removed, or the link is stale."
+            action={
+              <Button variant="ghost" asChild>
+                <Link to="/desk/queue">Back to the queue</Link>
+              </Button>
+            }
+          />
+        </Panel>
+      </div>
+    );
+  }
+
   const role = session.data?.role === "admin" ? "admin" : "agent";
   const { lockedByOther, canClaim, canRelease, canAssign, isTerminal, mine } = ownershipRules(ticket, role);
   // Agents see a read-only banner on others' tickets; admins always work.

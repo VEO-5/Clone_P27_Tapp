@@ -39,7 +39,8 @@ export const CATEGORY_NAMES: Record<string, string> = Object.fromEntries(
 );
 
 /** Sync fallback for non-component contexts. Prefer `useCategoryName`. */
-export function categoryName(id: string): string {
+export function categoryName(id?: string): string {
+  if (!id) return "—";
   return CATEGORY_NAMES[id] ?? id;
 }
 
@@ -58,7 +59,8 @@ export function useCategories() {
  * Resolve a category id to its current display name.
  * Live store -> seed fallback (covers removed ids + offline) -> raw id.
  */
-export function useCategoryName(categoryId: string): string {
+export function useCategoryName(categoryId?: string): string {
   const { data } = useCategories();
+  if (!categoryId) return "—";
   return data?.find((c) => c.id === categoryId)?.name ?? CATEGORY_NAMES[categoryId] ?? categoryId;
 }
