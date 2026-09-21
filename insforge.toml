@@ -1,5 +1,5 @@
 [auth]
-allowed_redirect_urls = ["https://6r6mz2vp.insforge.site/sign-in", "https://6r6mz2vp.insforge.site/", "http://localhost:5173/sign-in", "http://localhost:5173/"]
+allowed_redirect_urls = ["http://localhost:5173/", "http://localhost:5173/sign-in", "https://6r6mz2vp.insforge.site/", "https://6r6mz2vp.insforge.site/sign-in", "https://pearl27-ticketing.insforge.site/", "https://pearl27-ticketing.insforge.site/sign-in"]
 require_email_verification = true
 verify_email_method = "code"
 reset_password_method = "code"
