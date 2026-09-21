@@ -9,7 +9,7 @@ import type { DeskTicket } from "@pearl27/contracts";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Card, CardContent } from "@/components/shadcn/card";
 import { StatusBadge } from "@/components/ui/Badge";
-import { categoryName } from "@/features/tickets/categories";
+import { useCategoryName } from "@/features/tickets/categories";
 import { cn } from "@/lib/utils";
 
 function PriorityIcon({ priority }: { priority: DeskTicket["priority"] }) {
@@ -26,6 +26,7 @@ const CHANNEL_ICONS: ComponentType<{ className?: string }>[] = [Mail];
 export function TicketKanbanCard({ ticket }: { ticket: DeskTicket }) {
   const ChannelIcon = CHANNEL_ICONS[0]!;
   const displayName = ticket.assignee?.name ?? ticket.requesterName ?? "Employee";
+  const resolvedCategoryName = useCategoryName(ticket.categoryId);
 
   return (
     <Card
@@ -54,7 +55,7 @@ export function TicketKanbanCard({ ticket }: { ticket: DeskTicket }) {
         <Link
           to={`/desk/tickets/${ticket.id}`}
           className="line-clamp-2 min-h-9 text-[13px] font-medium leading-snug tracking-tight text-pearl underline-offset-4 hover:underline break-words"
-          title={`${ticket.reference} · ${categoryName(ticket.categoryId)}`}
+          title={`${ticket.reference} · ${resolvedCategoryName}`}
         >
           {ticket.title}
         </Link>

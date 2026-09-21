@@ -1,11 +1,12 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { Profile } from "@/lib/contracts.vendored";
 
 import { ApiError, apiFetch } from "@/lib/api";
 import { config } from "@/lib/config";
 import { queryKeys } from "@/lib/query";
+import { waitForAuthHydration } from "@/lib/session-persist";
 
 import { mockSignOut } from "./mockSession";
 import { liveSignOut } from "./liveSession";
@@ -16,11 +17,31 @@ export interface SessionProfile extends Profile {
   demoted?: boolean;
 }
 
-/** Session query on GET /auth/me, cached for the session. 401 = signed out. */
+/**
+ * Session query on GET /auth/me, cached for the session. 401 = signed out.
+ *
+ * Live mode waits for auth hydration first: on a cold load the SDK session
+ * starts empty and may need a silent refresh round-trip. Firing /auth/me
+ * before that settles produces a false 401 and RoleGate bounces to
+ * /sign-in — the reload-signout bug. While hydrating, the query stays
+ * pending (RoleGate renders its skeleton, never a redirect).
+ */
 export function useSession() {
+  const [hydrated, setHydrated] = useState(!config.insforgeLive);
+  useEffect(() => {
+    if (!config.insforgeLive) return;
+    let cancelled = false;
+    void waitForAuthHydration().then(() => {
+      if (!cancelled) setHydrated(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   return useQuery<SessionProfile, ApiError>({
     queryKey: queryKeys.me,
     queryFn: () => apiFetch<Profile>("/auth/me"),
+    enabled: hydrated,
     staleTime: Infinity,
     gcTime: Infinity,
     retry: false,

@@ -64,6 +64,12 @@ function bodyProps(body: BodyInit | null | undefined): Record<string, unknown> {
   }
 }
 
+/** Generic event capture (no-op until init). Prefer domain helpers above. */
+export function trackEvent(name: string, props?: Record<string, unknown>): void {
+  if (!started) return;
+  posthog.capture(name, props);
+}
+
 /**
  * Domain events derived from API calls (single choke point in apiFetch /
  * liveFetch, so mock + live modes both report). Only successful calls reach

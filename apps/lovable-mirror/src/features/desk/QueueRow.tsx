@@ -6,7 +6,7 @@ import type { Assignee, DeskTicket } from "@pearl27/contracts";
 
 import { UserAvatar } from "@/components/UserAvatar";
 import { PriorityBadge, StatusBadge } from "@/components/ui/Badge";
-import { categoryName } from "@/features/tickets/categories";
+import { useCategoryName } from "@/features/tickets/categories";
 import { formatRelative, requesterEmail } from "@/lib/utils";
 
 import { ClaimButton } from "./ClaimButton";
@@ -35,6 +35,7 @@ export function QueueRow({
   index?: number;
 }) {
   const { canClaim, canRelease, canAssign, isTerminal } = useOwnership(ticket, role);
+  const resolvedCategoryName = useCategoryName(ticket.categoryId);
   const requester = ticket.requesterName ?? "Employee";
   const hint = ownershipHint(ticket);
 
@@ -80,7 +81,7 @@ export function QueueRow({
       >
         {ticket.title}
       </Link>
-      <p className="mt-0.5 text-xs text-fog">{categoryName(ticket.categoryId)}</p>
+      <p className="mt-0.5 text-xs text-fog">{resolvedCategoryName}</p>
 
       {/* Description */}
       <p className="mt-2 line-clamp-2 text-[13px] leading-relaxed text-mist break-words">{ticket.description}</p>

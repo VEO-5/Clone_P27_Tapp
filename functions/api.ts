@@ -750,5 +750,509 @@ export default async function (req: Request): Promise<Response> {
     return json(req, data ?? []);
   }
 
+  // -- Admin category management ------------------------------------------------
+  // Mirrors the MSW reference (mocks/handlers + mocks/categories): same paths,
+  // same envelopes, same rules. "other" is the protected fallback (ticket
+  // intake coerces unknown categories to it), so it can be renamed but never
+  // removed. Removing a category reassigns its tickets to "other" first:
+  // tickets.category_id references categories(id) with NO ACTION, and counts
+  // must never silently vanish.
+  if (req.method === "GET" && path === "/admin/categories") {
+    if (!isAdmin) return FORBIDDEN(req);
+    const { data, error } = await db
+      .from("categories")
+      .select("id, name")
+      .order("name", { ascending: true });
+    if (error) return err(req, 500, "DB_ERROR", "Couldn't load categories.");
+    return json(
+      req,
+      ((data ?? []) as { id: string; name: string }[]).map((c) => ({
+        id: c.id,
+        name: c.name,
+      })),
+    );
+  }
+
+  if (req.method === "POST" && path === "/admin/categories") {
+    if (!isAdmin) return FORBIDDEN(req);
+    const name = String(body.name ?? "").trim();
+    if (!name) {
+      return err(req, 422, "VALIDATION_FAILED", "Check the highlighted fields.", {
+        fieldErrors: { name: "Category name is required" },
+      });
+    }
+    const bytes = new Uint8Array(3);
+    crypto.getRandomValues(bytes);
+    const suffix = [...bytes].map((b) => b.toString(36)).join("").slice(0, 4);
+    const id = `cat-${Date.now().toString(36)}${suffix}`;
+    const row: Record<string, unknown> = { id, name };
+    if (body.formSchema !== undefined) row["form_schema"] = body.formSchema;
+    const { data, error } = await db
+      .from("categories")
+      .insert([row])
+      .select("id, name")
+      .single();
+    if (error || !data) return err(req, 500, "DB_ERROR", "Couldn't add the category.");
+    const created = data as { id: string; name: string };
+    return json(req, { id: created.id, name: created.name }, 201);
+  }
+
+  {
+    const m = path.match(/^\/admin\/categories\/([^/]+)$/);
+    if (m && (req.method === "PATCH" || req.method === "DELETE")) {
+      if (!isAdmin) return FORBIDDEN(req);
+      const id = decodeURIComponent(m[1]);
+      const { data: existing } = await db
+        .from("categories")
+        .select("id")
+        .eq("id", id)
+        .maybeSingle();
+      if (!existing || (id === "other" && req.method === "DELETE")) {
+        return err(req, 404, "NOT_FOUND", "Category not found or required.");
+      }
+      if (req.method === "DELETE") {
+        await db.from("tickets").update({ category_id: "other" }).eq("category_id", id);
+        const { error } = await db.from("categories").delete().eq("id", id);
+        if (error) return err(req, 500, "DB_ERROR", "Couldn't remove the category.");
+        return new Response(null, { status: 204, headers: cors(req) });
+      }
+      const patch: Record<string, unknown> = {};
+      if (body.name !== undefined) {
+        const name = String(body.name ?? "").trim();
+        if (!name) {
+          return err(req, 422, "VALIDATION_FAILED", "Check the highlighted fields.", {
+            fieldErrors: { name: "Category name is required" },
+          });
+        }
+        patch["name"] = name;
+      }
+      if (body.formSchema !== undefined) patch["form_schema"] = body.formSchema;
+      if (Object.keys(patch).length === 0) {
+        const { data: current } = await db
+          .from("categories")
+          .select("id, name")
+          .eq("id", id)
+          .single();
+        const row = current as { id: string; name: string } | null;
+        if (!row) return err(req, 404, "NOT_FOUND", "Category not found or required.");
+        return json(req, { id: row.id, name: row.name });
+      }
+      const { data, error } = await db
+        .from("categories")
+        .update(patch)
+        .eq("id", id)
+        .select("id, name")
+        .single();
+      if (error || !data) return err(req, 500, "DB_ERROR", "Couldn't rename the category.");
+      const updated = data as { id: string; name: string };
+      return json(req, { id: updated.id, name: updated.name });
+    }
+  }
+
+  // -- Admin analytics + management (admin only) --------------------------------
+  // Mirrors the MSW reference envelopes. Honest-data policy (same as
+  // /desk/dashboard): no SLA policy columns exist, so slaTable is [] (the UI
+  // renders its "No tickets breaching" empty state) and resolution averages
+  // are real-or-zero. Directory invites are intentionally unsupported for now
+  // (minting auth users needs a product decision) — POST returns 501.
+  if (req.method === "GET" && path === "/admin/dashboard") {
+    if (!isAdmin) return FORBIDDEN(req);
+    const rangeRaw = params.get("range");
+    const rangeDays = rangeRaw === "7" ? 7 : rangeRaw === "90" ? 90 : 30;
+    const day = 86_400_000;
+    const now = Date.now();
+    const { data: all } = await db
+      .from("tickets")
+      .select("id, reference, title, priority, status, category_id, assignee_id, created_at, resolved_at")
+      .order("created_at", { ascending: false })
+      .limit(1000);
+    const tickets = ((all ?? []) as {
+      id: string; reference: string; title: string; priority: string; status: string;
+      category_id: string; assignee_id: string | null; created_at: string; resolved_at: string | null;
+    }[]);
+    const open = tickets.filter((t) => t.status !== "resolved");
+    const resolved = tickets.filter((t) => t.status === "resolved" && t.resolved_at);
+    const hours = (a: string, b: string) => (Date.parse(b) - Date.parse(a)) / 3_600_000;
+    const avgResolution = resolved.length > 0
+      ? Math.round((resolved.reduce((s, t) => s + hours(t.created_at, t.resolved_at as string), 0) / resolved.length) * 10) / 10
+      : 0;
+    const volume = [...Array(rangeDays)].map((_, i) => {
+      const d = new Date(now - (rangeDays - 1 - i) * day);
+      const key = d.toISOString().slice(0, 10);
+      return {
+        date: key,
+        received: tickets.filter((t) => t.created_at.slice(0, 10) === key).length,
+        resolved: tickets.filter((t) => (t.resolved_at ?? "").slice(0, 10) === key).length,
+      };
+    });
+    const { data: staff } = await db
+      .from("profiles")
+      .select("id, name")
+      .in("role", ["agent", "admin"])
+      .order("name", { ascending: true });
+    const agents = ((staff ?? []) as { id: string; name: string }[]);
+    const byAgent = agents.map((a) => {
+      const mine = tickets.filter((t) => t.assignee_id === a.id);
+      const mineResolved = mine.filter((t) => t.status === "resolved" && t.resolved_at);
+      return {
+        agentId: a.id,
+        name: a.name,
+        received: mine.length,
+        assigned: mine.filter((t) => t.status !== "resolved").length,
+        resolved: mineResolved.length,
+        open: mine.filter((t) => t.status !== "resolved").length,
+        avgResolutionHours: mineResolved.length > 0
+          ? Math.round((mineResolved.reduce((s, t) => s + hours(t.created_at, t.resolved_at as string), 0) / mineResolved.length) * 10) / 10
+          : 0,
+        avgFirstResponseHours: 0,
+      };
+    });
+    const { data: recent } = await db
+      .from("ticket_events")
+      .select("id, ticket_id, type, message, actor, created_at")
+      .order("created_at", { ascending: false })
+      .limit(6);
+    const events = ((recent ?? []) as {
+      id: string; ticket_id: string; type: string; message: string | null; actor: string; created_at: string;
+    }[]);
+    const refById = new Map<string, string>();
+    if (events.length > 0) {
+      const { data: ts } = await db.from("tickets").select("id, reference").in("id", [...new Set(events.map((e) => e.ticket_id))]);
+      for (const t of ((ts ?? []) as { id: string; reference: string }[])) refById.set(t.id, t.reference);
+    }
+    const kindFor = (type: string) =>
+      type === "assigned" ? "assigned" : type === "released" ? "released" : type === "message" || type === "internal_note" ? "message" : "status_changed";
+    return json(req, {
+      rangeDays,
+      kpis: [
+        { key: "tickets", label: "Current Tickets", value: String(open.length), deltaPct: 0, deltaLabel: "vs last period", spark: volume.map((v) => v.received), upGood: false },
+        { key: "resolution", label: "Daily Avg. Resolution", value: resolved.length > 0 ? String(avgResolution) : "—", deltaPct: 0, deltaLabel: "vs last period", spark: volume.map((v) => v.resolved), upGood: true },
+        { key: "sla", label: "SLA Compliance Rate", value: "—", deltaPct: 0, deltaLabel: "no policy configured", spark: [], upGood: true },
+      ],
+      volume,
+      byAgent,
+      slaTable: [],
+      updates: events.map((e) => ({
+        id: e.id,
+        kind: kindFor(e.type),
+        ticketId: e.ticket_id,
+        ticketReference: refById.get(e.ticket_id) ?? "",
+        text: e.message ?? `${e.type} ${refById.get(e.ticket_id) ?? ""}`.trim(),
+        actorName: e.actor,
+        createdAt: e.created_at,
+      })),
+    });
+  }
+
+  async function adminSettingsPayload() {
+    const { data: row } = await db
+      .from("app_settings")
+      .select("auto_release_working_days, business_hours, holidays")
+      .eq("id", 1)
+      .maybeSingle();
+    const settings = (row ?? {}) as {
+      auto_release_working_days?: number; business_hours?: unknown; holidays?: unknown;
+    };
+    const { data: canned } = await db
+      .from("canned_responses")
+      .select("id, shortcut, title, body")
+      .order("title", { ascending: true });
+    return {
+      autoReleaseWorkingDays: settings.auto_release_working_days ?? 3,
+      businessHours: (settings.business_hours as { day: string; open: string; close: string; closed: boolean }[]) ?? [],
+      holidays: (settings.holidays as { date: string; label: string }[]) ?? [],
+      cannedResponses: ((canned ?? []) as { id: string; shortcut: string; title: string; body: string }[]).map((c) => ({
+        id: c.id, shortcut: c.shortcut, title: c.title, body: c.body,
+      })),
+    };
+  }
+
+  if (req.method === "GET" && path === "/admin/settings") {
+    if (!isAdmin) return FORBIDDEN(req);
+    return json(req, await adminSettingsPayload());
+  }
+
+  if (req.method === "PATCH" && path === "/admin/settings") {
+    if (!isAdmin) return FORBIDDEN(req);
+    const value = Number(body.autoReleaseWorkingDays);
+    if (body.autoReleaseWorkingDays === undefined || !Number.isInteger(value) || value < 1) {
+      return err(req, 422, "VALIDATION_FAILED", "Check the highlighted fields.", {
+        fieldErrors: { autoReleaseWorkingDays: "Use at least 1 working day" },
+      });
+    }
+    const { error } = await db
+      .from("app_settings")
+      .update({ auto_release_working_days: value })
+      .eq("id", 1);
+    if (error) return err(req, 500, "DB_ERROR", "Couldn't save settings.");
+    return json(req, await adminSettingsPayload());
+  }
+
+  async function directoryEntries(role: "admin" | "agent") {
+    const { data: people, error } = await db
+      .from("profiles")
+      .select("id, email, name, avatar_url, role, team_id")
+      .eq("role", role)
+      .order("name", { ascending: true });
+    if (error) return null;
+    const { data: openTickets } = await db
+      .from("tickets")
+      .select("assignee_id")
+      .not("status", "eq", "resolved")
+      .limit(1000);
+    const openByAssignee = new Map<string, number>();
+    for (const t of ((openTickets ?? []) as { assignee_id: string | null }[])) {
+      if (t.assignee_id) openByAssignee.set(t.assignee_id, (openByAssignee.get(t.assignee_id) ?? 0) + 1);
+    }
+    return ((people ?? []) as {
+      id: string; email: string; name: string; avatar_url: string | null; role: string; team_id: string | null;
+    }[]).map((x) => ({
+      id: x.id,
+      email: x.email,
+      name: x.name,
+      avatarUrl: x.avatar_url,
+      role: x.role,
+      teamId: x.team_id,
+      status: "active" as const,
+      openTickets: openByAssignee.get(x.id) ?? 0,
+      lastSeen: null as string | null,
+    }));
+  }
+
+  if (req.method === "GET" && path === "/admin/admins") {
+    if (!isAdmin) return FORBIDDEN(req);
+    const rows = await directoryEntries("admin");
+    if (!rows) return err(req, 500, "DB_ERROR", "Couldn't load admins.");
+    return json(req, rows);
+  }
+
+  if (req.method === "GET" && path === "/admin/agents") {
+    if (!isAdmin) return FORBIDDEN(req);
+    const rows = await directoryEntries("agent");
+    if (!rows) return err(req, 500, "DB_ERROR", "Couldn't load agents.");
+    return json(req, rows);
+  }
+
+  // Invites mint real logins — creating auth users from here needs a product
+  // decision (email delivery, first-sign-in claim). Honest 501 until then.
+  if (req.method === "POST" && (path === "/admin/admins" || path === "/admin/agents")) {
+    if (!isAdmin) return FORBIDDEN(req);
+    return err(req, 501, "NOT_SUPPORTED", "Invites aren't available on this backend yet.");
+  }
+
+  {
+    const m = path.match(/^\/(admin)\/(admins|agents)\/([^/]+)$/);
+    // Demote-to-employee mirrors the mock "deactivated" outcome (desk access
+    // lost immediately; row drops off the directory on refetch). Reversible
+    // by flipping the role back. Self-demotion and the final admin are
+    // refused — both would lock administration out.
+    if (m && req.method === "DELETE") {
+      if (!isAdmin) return FORBIDDEN(req);
+      const kind = m[2] === "admins" ? ("admin" as const) : ("agent" as const);
+      const id = decodeURIComponent(m[3]);
+      const { data: target } = await db
+        .from("profiles")
+        .select("id, email, name, avatar_url, role, team_id")
+        .eq("id", id)
+        .eq("role", kind)
+        .maybeSingle();
+      const person = target as {
+        id: string; email: string; name: string; avatar_url: string | null; role: string; team_id: string | null;
+      } | null;
+      if (!person) {
+        return err(req, 404, "NOT_FOUND", kind === "admin" ? "Admin not found" : "Agent not found");
+      }
+      if (person.id === p.id) {
+        return err(req, 403, "SELF_DEACTIVATION", "You can't deactivate your own account.");
+      }
+      if (kind === "admin") {
+        const { data: admins } = await db.from("profiles").select("id").eq("role", "admin").limit(2);
+        if ((((admins ?? []) as { id: string }[]).length) <= 1) {
+          return err(req, 409, "LAST_ADMIN", "Demote another admin first — the workspace needs at least one.");
+        }
+      }
+      const { error } = await db.from("profiles").update({ role: "employee" }).eq("id", person.id);
+      if (error) return err(req, 500, "DB_ERROR", "Couldn't deactivate this account.");
+      return json(req, {
+        id: person.id, email: person.email, name: person.name, avatarUrl: person.avatar_url,
+        role: person.role, teamId: person.team_id, status: "deactivated", openTickets: 0, lastSeen: null,
+      });
+    }
+  }
+
+  if (req.method === "GET" && path === "/admin/audit") {
+    if (!isAdmin) return FORBIDDEN(req);
+    const limit = Math.min(Math.max(Number(params.get("limit") ?? 15), 1), 50);
+    const cursor = Number(params.get("cursor") ?? 0) || 0;
+    const { data: events, error } = await db
+      .from("ticket_events")
+      .select("id, ticket_id, type, message, actor, created_at")
+      .order("created_at", { ascending: false })
+      .range(cursor, cursor + limit - 1);
+    if (error) return err(req, 500, "DB_ERROR", "Couldn't load the audit log.");
+    const rows = ((events ?? []) as {
+      id: string; ticket_id: string; type: string; message: string | null; actor: string; created_at: string;
+    }[]);
+    const refById = new Map<string, string>();
+    if (rows.length > 0) {
+      const { data: ts } = await db.from("tickets").select("id, reference").in("id", [...new Set(rows.map((e) => e.ticket_id))]);
+      for (const t of ((ts ?? []) as { id: string; reference: string }[])) refById.set(t.id, t.reference);
+    }
+    return json(req, {
+      items: rows.map((e) => ({
+        id: e.id,
+        actor: e.actor,
+        action: `ticket.${e.type}`,
+        entity: `ticket:${refById.get(e.ticket_id) ?? e.ticket_id}`,
+        summary: e.message ?? `${e.type} ${refById.get(e.ticket_id) ?? ""}`.trim(),
+        createdAt: e.created_at,
+      })),
+      nextCursor: rows.length === limit ? String(cursor + limit) : null,
+    });
+  }
+
+  function toKnownIssue(r: {
+    id: string; title: string; message: string; severity: string;
+    starts_at: string; ends_at: string | null; active: boolean;
+  }) {
+    return {
+      id: r.id, title: r.title, message: r.message, severity: r.severity,
+      startsAt: r.starts_at, endsAt: r.ends_at, active: r.active,
+    };
+  }
+
+  if (req.method === "GET" && path === "/admin/known-issues") {
+    if (!isAdmin) return FORBIDDEN(req);
+    const { data, error } = await db
+      .from("known_issues")
+      .select("id, title, message, severity, starts_at, ends_at, active")
+      .order("created_at", { ascending: false });
+    if (error) return err(req, 500, "DB_ERROR", "Couldn't load incident banners.");
+    return json(req, ((data ?? []) as Parameters<typeof toKnownIssue>[0][]).map(toKnownIssue));
+  }
+
+  if (req.method === "POST" && path === "/admin/known-issues") {
+    if (!isAdmin) return FORBIDDEN(req);
+    const title = String(body.title ?? "").trim();
+    const message = String(body.message ?? "").trim();
+    const severity = String(body.severity ?? "major");
+    if (title.length < 5) {
+      return err(req, 422, "VALIDATION_FAILED", "Check the highlighted fields.", {
+        fieldErrors: { title: "Give the issue a short title (at least 5 characters)" },
+      });
+    }
+    if (message.length < 20) {
+      return err(req, 422, "VALIDATION_FAILED", "Check the highlighted fields.", {
+        fieldErrors: { message: "Explain it in at least 20 characters" },
+      });
+    }
+    if (severity !== "minor" && severity !== "major" && severity !== "critical") {
+      return err(req, 422, "VALIDATION_FAILED", "Check the highlighted fields.", {
+        fieldErrors: { severity: "Pick a valid severity" },
+      });
+    }
+    const endsAt = typeof body.endsAt === "string" && body.endsAt ? body.endsAt : null;
+    const { data, error } = await db
+      .from("known_issues")
+      .insert([{ title, message, severity, ends_at: endsAt }])
+      .select("id, title, message, severity, starts_at, ends_at, active")
+      .single();
+    if (error || !data) return err(req, 500, "DB_ERROR", "Couldn't publish the banner.");
+    return json(req, toKnownIssue(data as Parameters<typeof toKnownIssue>[0]), 201);
+  }
+
+  {
+    const m = path.match(/^\/admin\/known-issues\/([^/]+)$/);
+    if (m && req.method === "PATCH") {
+      if (!isAdmin) return FORBIDDEN(req);
+      const id = decodeURIComponent(m[1]);
+      const patch: Record<string, unknown> = {};
+      if (body.title !== undefined) {
+        const title = String(body.title ?? "").trim();
+        if (title.length < 5) {
+          return err(req, 422, "VALIDATION_FAILED", "Check the highlighted fields.", {
+            fieldErrors: { title: "Give the issue a short title (at least 5 characters)" },
+          });
+        }
+        patch["title"] = title;
+      }
+      if (body.message !== undefined) {
+        const message = String(body.message ?? "").trim();
+        if (message.length < 20) {
+          return err(req, 422, "VALIDATION_FAILED", "Check the highlighted fields.", {
+            fieldErrors: { message: "Explain it in at least 20 characters" },
+          });
+        }
+        patch["message"] = message;
+      }
+      if (body.severity !== undefined) {
+        const severity = String(body.severity);
+        if (severity !== "minor" && severity !== "major" && severity !== "critical") {
+          return err(req, 422, "VALIDATION_FAILED", "Check the highlighted fields.", {
+            fieldErrors: { severity: "Pick a valid severity" },
+          });
+        }
+        patch["severity"] = severity;
+      }
+      if (body.endsAt !== undefined) patch["ends_at"] = body.endsAt || null;
+      if (body.active !== undefined) patch["active"] = Boolean(body.active);
+      const { data, error } = await db
+        .from("known_issues")
+        .update(patch)
+        .eq("id", id)
+        .select("id, title, message, severity, starts_at, ends_at, active")
+        .single();
+      if (error || !data) return err(req, 404, "NOT_FOUND", "Issue not found.");
+      return json(req, toKnownIssue(data as Parameters<typeof toKnownIssue>[0]));
+    }
+  }
+
+  {
+    const m = path.match(/^\/admin\/known-issues\/([^/]+)\/end$/);
+    if (m && req.method === "POST") {
+      if (!isAdmin) return FORBIDDEN(req);
+      const id = decodeURIComponent(m[1]);
+      const { data, error } = await db
+        .from("known_issues")
+        .update({ active: false, ends_at: new Date().toISOString() })
+        .eq("id", id)
+        .select("id, title, message, severity, starts_at, ends_at, active")
+        .single();
+      if (error || !data) return err(req, 404, "NOT_FOUND", "Issue not found.");
+      return json(req, toKnownIssue(data as Parameters<typeof toKnownIssue>[0]));
+    }
+  }
+
+  if (req.method === "GET" && path === "/admin/export") {
+    if (!isAdmin) return FORBIDDEN(req);
+    const format = params.get("format") ?? "csv";
+    if (format !== "csv") {
+      return err(req, 422, "VALIDATION_FAILED", "Only CSV export is supported.");
+    }
+    const { data: all, error } = await db
+      .from("tickets")
+      .select("reference, title, status, priority, assignee_id, created_at")
+      .order("created_at", { ascending: false })
+      .limit(1000);
+    if (error) return err(req, 500, "DB_ERROR", "Couldn't export tickets.");
+    const rows = ((all ?? []) as {
+      reference: string; title: string; status: string; priority: string;
+      assignee_id: string | null; created_at: string;
+    }[]);
+    const nameById = new Map<string, string>();
+    const assigneeIds = [...new Set(rows.map((r) => r.assignee_id).filter((v): v is string => Boolean(v)))];
+    if (assigneeIds.length > 0) {
+      const { data: people } = await db.from("profiles").select("id, name").in("id", assigneeIds);
+      for (const a of ((people ?? []) as { id: string; name: string }[])) nameById.set(a.id, a.name);
+    }
+    const cell = (v: string) => `"${v.replace(/"/g, '""')}"`;
+    const lines = ["reference,title,status,priority,assignee,created_at", ...rows.map((t) =>
+      [t.reference, cell(t.title), t.status, t.priority, t.assignee_id ? (nameById.get(t.assignee_id) ?? "") : "", t.created_at].join(","),
+    )];
+    return new Response(lines.join("\n"), {
+      headers: { ...cors(req), "Content-Type": "text/csv" },
+    });
+  }
+
   return err(req, 404, "NOT_FOUND", "Unknown endpoint.");
 }

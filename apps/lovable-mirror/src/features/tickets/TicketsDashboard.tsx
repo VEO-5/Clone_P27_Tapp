@@ -4,14 +4,14 @@ import { useQuery } from "@tanstack/react-query";
 import type { Ticket } from "@pearl27/contracts";
 import { ArrowRight, Inbox } from "lucide-react";
 import { useState } from "react";
-import { Link } from "@tanstack/react-router";
 
 import { TicketCard } from "@/features/tickets/TicketCard";
+import { ReportIssueSheet } from "@/features/tickets/ReportIssueSheet";
 import { Button } from "@/components/shadcn/button";
 import { NightStat } from "@/components/ui/NightStat";
 import { EmptyState, Panel } from "@/components/ui/Panel";
 import { Skeleton } from "@/components/shadcn/skeleton";
-import { CsatPrompt } from "@/features/tickets/CsatPrompt";
+import { CsatPopup, isCsatSnoozed } from "@/features/tickets/CsatPopup";
 import { KnownIssueBanner } from "@/features/tickets/KnownIssueBanner";
 import { useSession } from "@/features/auth/useSession";
 import { apiFetch } from "@/lib/api";
@@ -28,6 +28,7 @@ export default function TicketsDashboard() {
   const [cursor, setCursor] = useState<string | null>(null);
   const [dismissedCsat, setDismissedCsat] = useState<string[]>([]);
   const [dismissedDemotion, setDismissedDemotion] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const session = useSession();
 
   const mine = useQuery({
@@ -52,7 +53,11 @@ export default function TicketsDashboard() {
   const items = pages.flat();
   const seen = new Set<string>();
   const deduped = items.filter((ticket) => (seen.has(ticket.id) ? false : (seen.add(ticket.id), true)));
-  const csatTickets = (unrated.data?.items ?? []).filter((t) => !dismissedCsat.includes(t.id));
+  // Fly-in candidates: unrated, not dismissed this session, not snoozed
+  // recently. Oldest first, max one popup per session (parent renders one).
+  const csatTickets = (unrated.data?.items ?? []).filter(
+    (t) => !dismissedCsat.includes(t.id) && !isCsatSnoozed(t.id),
+  );
 
   return (
     <div className="mx-auto max-w-3xl px-4 pb-8 pt-10 sm:px-6 sm:pt-14">
@@ -61,12 +66,11 @@ export default function TicketsDashboard() {
           <p className="eyebrow">Your inbox</p>
           <h1 className="mt-3 font-display text-4xl tracking-tight text-pearl">My tickets</h1>
         </div>
-        <Button variant="outline" size="sm" asChild>
-          <Link to="/tickets/new">
-            Report an issue
-            <ArrowRight className="size-3.5" aria-hidden />
-          </Link>
+        <Button variant="outline" size="sm" onClick={() => setReportOpen(true)}>
+          Report an issue
+          <ArrowRight className="size-3.5" aria-hidden />
         </Button>
+        <ReportIssueSheet open={reportOpen} onOpenChange={setReportOpen} />
       </div>
 
       {session.data?.demoted && !dismissedDemotion && (
@@ -116,9 +120,14 @@ export default function TicketsDashboard() {
       )}
 
       {csatTickets.slice(0, 1).map((ticket) => (
-        <div key={ticket.id} className="mb-6">
-          <CsatPrompt ticket={ticket} onRated={() => setDismissedCsat((list) => [...list, ticket.id])} />
-        </div>
+        <CsatPopup
+          key={ticket.id}
+          ticket={ticket}
+          onDone={() => {
+            setDismissedCsat((list) => [...list, ticket.id]);
+            void unrated.refetch();
+          }}
+        />
       ))}
 
       {mine.data && deduped.length === 0 ? (
@@ -129,8 +138,8 @@ export default function TicketsDashboard() {
             title="No tickets yet"
             description="Submit a Sphere issue and it will land here with a live status."
             action={
-              <Button asChild>
-                <Link to="/tickets/new">Report an issue</Link>
+              <Button onClick={() => setReportOpen(true)}>
+                Report an issue
               </Button>
             }
           />

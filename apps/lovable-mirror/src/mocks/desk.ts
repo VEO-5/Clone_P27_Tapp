@@ -1,5 +1,6 @@
 import type { ActivityItem, Assignee, DeskDashboard, DeskTicket } from "@pearl27/contracts";
 
+import { listCategories } from "./categories";
 import { getMockProfile } from "./fixtures";
 
 // ---------------------------------------------------------------------------
@@ -350,15 +351,27 @@ export function deskDashboard(rangeDays: number): DeskDashboard {
     status,
     count: all.filter((t) => t.status === status).length,
   }));
-  const catNames: Record<string, string> = {
-    account_access: "Account access", sphere_app: "Sphere app", hardware: "Hardware",
-    network: "Network", email: "Email", other: "Other",
-  };
-  const byCategory = Object.keys(catNames).map((categoryId) => ({
-    categoryId,
-    categoryName: catNames[categoryId]!,
-    count: all.filter((t) => t.categoryId === categoryId).length,
-  }));
+  // Category names come from the live store (same source as /categories),
+  // so admin renames/removes flow into the sidebar + board on refetch.
+  // (Mirrors production, where the categories table backs both endpoints.)
+  // Tickets filed under a since-removed category keep an orphan bucket
+  // labelled by id — counts must never silently vanish.
+  const liveCategories = listCategories();
+  const liveById = new Map(liveCategories.map((c) => [c.id, c.name]));
+  const byCategory = [
+    ...liveCategories.map((c) => ({
+      categoryId: c.id,
+      categoryName: c.name,
+      count: all.filter((t) => t.categoryId === c.id).length,
+    })),
+    ...[...new Set(all.map((t) => t.categoryId))]
+      .filter((categoryId) => !liveById.has(categoryId))
+      .map((categoryId) => ({
+        categoryId,
+        categoryName: categoryId,
+        count: all.filter((t) => t.categoryId === categoryId).length,
+      })),
+  ];
   const ageBuckets = [
     { bucket: "0–1 d", count: all.filter((t) => NOW - new Date(t.createdAt).getTime() < 24 * HOURS).length },
     { bucket: "1–3 d", count: all.filter((t) => { const a = NOW - new Date(t.createdAt).getTime(); return a >= 24 * HOURS && a < 3 * 24 * HOURS; }).length },

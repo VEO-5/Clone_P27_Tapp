@@ -14,7 +14,7 @@ import { Button } from "@/components/shadcn/button";
 import { PriorityBadge, StatusBadge } from "@/components/ui/Badge";
 import { EmptyState, Panel, PanelHeader } from "@/components/ui/Panel";
 import { Skeleton } from "@/components/shadcn/skeleton";
-import { categoryName } from "@/features/tickets/categories";
+import { useCategoryName } from "@/features/tickets/categories";
 import { useSession } from "@/features/auth/useSession";
 import { apiFetch, ApiError } from "@/lib/api";
 import { config } from "@/lib/config";
@@ -81,6 +81,9 @@ export function ReplyScreen({ id }: { id: string }) {
     queryFn: () => apiFetch<Assignee[]>("/desk/agents"),
     staleTime: 300_000,
   });
+  // Hook first (before the early returns below): "" resolves to "" and is
+  // discarded on the loading/error branches.
+  const resolvedCategoryName = useCategoryName(detail.data?.ticket.categoryId ?? "");
 
   if (detail.isPending) {
     return (
@@ -160,7 +163,7 @@ export function ReplyScreen({ id }: { id: string }) {
           <PanelHeader
             eyebrow={ticket.reference}
             title={ticket.title}
-            description={`${ticket.requesterName ?? "Employee"} · ${categoryName(ticket.categoryId)} · Submitted ${formatDateTime(ticket.createdAt)}`}
+            description={`${ticket.requesterName ?? "Employee"} · ${resolvedCategoryName} · Submitted ${formatDateTime(ticket.createdAt)}`}
             className="lg:sticky lg:top-0 lg:z-10 lg:rounded-t-[4px] lg:bg-white"
             action={
               <div className="flex flex-wrap items-center gap-2">

@@ -8,6 +8,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/shadcn/button";
 import { Field, Input } from "@/components/ui/Form";
+import { categoriesQueryKey } from "@/features/tickets/categories";
 import { ApiError, apiFetch } from "@/lib/api";
 
 /** Category list + create/edit/delete. Employees pick these in the ticket form. */
@@ -23,9 +24,14 @@ export function CategoryManager() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  // Fan-out: the manager's own list, the shared category cache backing
+  // every form + ticket label, and the desk dashboard aggregate behind the
+  // sidebar Categories + board filters. Ticket rows carry only categoryId
+  // and resolve names through the shared cache, so no ticket refetch needed.
   async function refresh() {
     await queryClient.invalidateQueries({ queryKey: ["admin", "categories"] });
-    await queryClient.invalidateQueries({ queryKey: ["categories"] });
+    await queryClient.invalidateQueries({ queryKey: categoriesQueryKey });
+    await queryClient.invalidateQueries({ queryKey: ["desk", "dashboard"] });
   }
 
   async function create(event: React.FormEvent) {

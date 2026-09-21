@@ -12,10 +12,12 @@ import { MockProvider } from "./components/MockProvider";
 import { Toaster } from "./components/shadcn/sonner";
 import { TooltipProvider } from "./components/shadcn/tooltip";
 import { initAnalytics } from "./lib/analytics";
+import { initSession } from "./lib/session-persist";
 import "./fonts.css";
 import "./styles.css";
 
 initAnalytics();
+initSession();
 
 const queryClient = new QueryClient();
 

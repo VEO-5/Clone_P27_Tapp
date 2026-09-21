@@ -1,52 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import type { Ticket } from "@pearl27/contracts";
 import { Loader2, Star } from "lucide-react";
+import type { Ticket } from "@pearl27/contracts";
 
 import { Button } from "@/components/shadcn/button";
-import { apiFetch, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { useCsatSubmit } from "./useCsatSubmit";
 
 /** CSAT form on a resolved, unrated ticket (FE-2.16). */
 export function CsatPrompt({ ticket, onRated }: { ticket: Ticket; onRated: () => void }) {
-  const [score, setScore] = useState(0);
-  const [comment, setComment] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [sending, setSending] = useState(false);
-  const [done, setDone] = useState(false);
-  const ratedTimer = useRef<number | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (ratedTimer.current !== null) window.clearTimeout(ratedTimer.current);
-    };
-  }, []);
-
-  async function submit(event: React.FormEvent) {
-    event.preventDefault();
-    if (score < 1) {
-      setError("Pick a rating from 1 to 5.");
-      return;
-    }
-    setError(null);
-    setSending(true);
-    try {
-      await apiFetch(`/tickets/${ticket.id}/csat`, {
-        method: "POST",
-        body: JSON.stringify({ score, comment: comment.trim() || undefined }),
-      });
-      setDone(true);
-      // Let the thanks state paint before the parent dismisses this prompt
-      // (dashboard unmounts on onRated; detail refetches unrated). Without the
-      // delay the form just vanishes with no confirmation.
-      ratedTimer.current = window.setTimeout(() => onRated(), 2500);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't send your rating. Try again.");
-    } finally {
-      setSending(false);
-    }
-  }
+  const { score, setScore, comment, setComment, error, sending, done, submit } =
+    useCsatSubmit(ticket, onRated);
 
   if (done) {
     return (
@@ -58,7 +22,7 @@ export function CsatPrompt({ ticket, onRated }: { ticket: Ticket; onRated: () =>
 
   return (
     <form
-      onSubmit={submit}
+      onSubmit={(event) => void submit(event)}
       className="rounded-[4px] border border-ink-700 bg-white p-4"
       aria-label={`Rate ${ticket.reference}`}
     >

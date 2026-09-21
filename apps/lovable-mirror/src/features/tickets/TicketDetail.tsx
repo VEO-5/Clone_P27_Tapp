@@ -13,7 +13,7 @@ import { EmptyState, Panel, PanelHeader } from "@/components/ui/Panel";
 import { Skeleton } from "@/components/shadcn/skeleton";
 import { CsatPrompt } from "@/features/tickets/CsatPrompt";
 import { StatusTimeline } from "@/features/tickets/StatusTimeline";
-import { categoryName } from "@/features/tickets/categories";
+import { useCategoryName } from "@/features/tickets/categories";
 import { ApiError, apiFetch } from "@/lib/api";
 import { formatDateTime } from "@/lib/utils";
 
@@ -33,6 +33,9 @@ export function TicketDetail({ reference }: { reference: string }) {
     queryKey: ["tickets", "mine", "unrated"],
     queryFn: () => apiFetch<{ items: Ticket[] }>("/tickets/mine/unrated"),
   });
+  // Hook first (before the early returns below): "" resolves to "" and is
+  // discarded on the loading/error branches.
+  const resolvedCategoryName = useCategoryName(detail.data?.categoryId ?? "");
 
   if (detail.isPending) {
     return (
@@ -95,7 +98,7 @@ export function TicketDetail({ reference }: { reference: string }) {
         <PanelHeader
           eyebrow="Ticket"
           title={ticket.title}
-          description={`${categoryName(ticket.categoryId)} · Submitted ${formatDateTime(ticket.createdAt)}`}
+          description={`${resolvedCategoryName} · Submitted ${formatDateTime(ticket.createdAt)}`}
           action={
             <div className="flex flex-wrap items-center gap-2">
               <StatusBadge status={ticket.status} />

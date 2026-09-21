@@ -37,6 +37,7 @@ import {
 } from "@/components/shadcn/table";
 import { apiFetch } from "@/lib/api";
 import { config } from "@/lib/config";
+import { insforge } from "@/lib/insforge";
 
 type Range = "7" | "30" | "90";
 
@@ -370,7 +371,14 @@ export function ManagementDashboard() {
     setExporting(true);
     const toastId = toast.loading("Preparing CSV export…");
     try {
-      const res = await fetch(`${config.apiUrl}/admin/export?format=csv&range=${range}`, { credentials: "include" });
+      // Live mode serves the export from the edge function (Bearer token),
+      // not the mock API base — config.apiUrl is meaningless there.
+      const res = config.insforgeLive
+        ? await fetch(
+          `${config.insforgeUrl}/functions/api?path=${encodeURIComponent(`/admin/export?format=csv&range=${range}`)}`,
+          { headers: { Authorization: `Bearer ${await insforge.getHttpClient().getValidAccessToken() ?? ""}` } },
+        )
+        : await fetch(`${config.apiUrl}/admin/export?format=csv&range=${range}`, { credentials: "include" });
       if (!res.ok) throw new Error("Export failed. Try again.");
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);

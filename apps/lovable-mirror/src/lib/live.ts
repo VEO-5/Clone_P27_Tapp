@@ -2,6 +2,7 @@ import { trackApiCall, trackApiError } from "./analytics";
 import { ApiError } from "./api";
 import { config } from "./config";
 import { insforge } from "./insforge";
+import { persistSession } from "./session-persist";
 
 /**
  * Live fetch against the InsForge `api` Edge Function router.
@@ -44,5 +45,7 @@ export async function liveFetch<T>(path: string, init: RequestInit = {}): Promis
   }
   if (res.status === 204) return undefined as T;
   trackApiCall(method, path, init.body);
+  // Keep the persisted token fresh across silent refreshes (fire-and-forget).
+  void persistSession();
   return payload as T;
 }

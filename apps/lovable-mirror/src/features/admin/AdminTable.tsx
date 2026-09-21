@@ -3,6 +3,8 @@
 
 import { useState } from "react";
 
+import { toast } from "sonner";
+
 import { UserAvatar } from "@/components/UserAvatar";
 import { Badge } from "@/components/shadcn/badge";
 import { Button } from "@/components/shadcn/button";
@@ -45,12 +47,16 @@ export function AdminTable({ initialAdmins }: { initialAdmins: MockAgent[] }) {
   const [notice, setNotice] = useState<string | null>(null);
 
   async function deactivate(admin: MockAgent) {
-    const updated = await apiFetch<MockAgent>(`/admin/admins/${admin.id}`, { method: "DELETE" });
-    // Journal the removal so a refresh can't resurrect the account.
-    recordMockDirectory({ role: "admin", email: updated.email, name: updated.name, status: updated.status });
-    setAdmins((list) => list.map((item) => (item.id === admin.id ? updated : item)));
-    setConfirming(null);
-    setNotice(`${admin.email} deactivated — they lost admin access immediately.`);
+    try {
+      const updated = await apiFetch<MockAgent>(`/admin/admins/${admin.id}`, { method: "DELETE" });
+      // Journal the removal so a refresh can't resurrect the account.
+      recordMockDirectory({ role: "admin", email: updated.email, name: updated.name, status: updated.status });
+      setAdmins((list) => list.map((item) => (item.id === admin.id ? updated : item)));
+      setConfirming(null);
+      setNotice(`${admin.email} deactivated — they lost admin access immediately.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't deactivate this admin.");
+    }
   }
 
   return (

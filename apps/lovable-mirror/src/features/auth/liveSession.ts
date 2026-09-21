@@ -2,6 +2,7 @@ import { landingForRole, type RoleName } from "@/lib/auth";
 import { ALLOWED_DOMAIN, type Profile } from "@/lib/contracts.vendored";
 import { insforge } from "@/lib/insforge";
 import { liveFetch } from "@/lib/live";
+import { clearPersistedSession, persistSession } from "@/lib/session-persist";
 
 /**
  * Live (InsForge Auth) session — replaces mockSession.ts when
@@ -40,16 +41,21 @@ export async function liveVerifyCode(email: string, otp: string): Promise<LiveSi
     name,
   });
   if (error) throw new Error(error.message || "Invalid or expired code.");
+  // Durable session: the SDK keeps the token in memory only, so persist it
+  // for reloads (restored at boot by initSession).
+  await persistSession();
   // Authoritative role from the server (profile auto-provisioned there).
   const profile = await liveFetch<Profile>("/auth/me");
   return { landing: landingForRole(profile.role as RoleName), profile };
 }
 
-/** Live sign-out: clear the InsForge session. */
+/** Live sign-out: clear the InsForge session + the persisted token. */
 export async function liveSignOut(): Promise<void> {
   try {
     await insforge.auth.signOut();
   } catch {
     // Local state reset matters more than the round-trip.
+  } finally {
+    clearPersistedSession();
   }
 }

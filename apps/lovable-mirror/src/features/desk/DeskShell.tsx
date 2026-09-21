@@ -43,6 +43,7 @@ import {
   TooltipTrigger,
 } from "@/components/shadcn/tooltip";
 import { useSession, useSignOut } from "@/features/auth/useSession";
+import { ReportIssueSheet } from "@/features/tickets/ReportIssueSheet";
 import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -193,6 +194,7 @@ function SidebarSection({
 function SidebarFooter({ collapsed }: { collapsed: boolean }) {
   const session = useSession();
   const signOut = useSignOut();
+  const [reportOpen, setReportOpen] = useState(false);
 
   if (!session.data) {
     return (
@@ -269,10 +271,8 @@ function SidebarFooter({ collapsed }: { collapsed: boolean }) {
                 </Link>
               </DropdownMenuItem>
             )}
-            <DropdownMenuItem asChild>
-              <Link to="/tickets/new">
-                <TicketIcon aria-hidden /> Report an issue
-              </Link>
+            <DropdownMenuItem onSelect={() => setReportOpen(true)}>
+              <TicketIcon aria-hidden /> Report an issue
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => void signOut()}>
@@ -280,6 +280,7 @@ function SidebarFooter({ collapsed }: { collapsed: boolean }) {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        <ReportIssueSheet open={reportOpen} onOpenChange={setReportOpen} />
       </div>
     </div>
   );
@@ -296,8 +297,13 @@ function Sidebar({
   const pathname = location.pathname;
   const searchParams = new URLSearchParams(location.search);
   const session = useSession();
-  // Drill-down layer (Carrot `Sidebar.Layers`): main nav ↔ administration.
-  const [layer, setLayer] = useState<"main" | "admin">("main");
+  // Drill-down layer (Carrot `Sidebar.Layers`): derived from the route, not
+  // local state. Local `useState("main")` desynced on refresh/deep-link:
+  // landing directly on /desk/admin/* showed the main nav with no
+  // Dashboard/Admin/Settings links, and the Administration row only toggled
+  // UI state without navigating — every click looked dead. Deriving from
+  // `pathname` keeps sidebar + URL in sync across reloads and navigation.
+  const [reportOpen, setReportOpen] = useState(false);
 
   const dashboard = useQuery({
     queryKey: ["desk", "dashboard"],
@@ -313,10 +319,13 @@ function Sidebar({
     staleTime: 30_000,
   });
 
-  // Drill-down layer (Carrot `Sidebar.Layers`): main nav ↔ administration.
+  // Drill-down layer (Carrot `Sidebar.Layers`): main nav ↔ administration,
+  // derived from the URL so refresh/deep-links never desync.
   const tickets = allTickets.data?.items ?? [];
   const viewerId = session.data?.id;
   const isAdmin = session.data?.role === "admin";
+  const onAdminRoute = pathname.startsWith("/desk/admin");
+  const layer = onAdminRoute ? "admin" : "main";
   const onBoard = pathname === "/desk";
   const onQueue = pathname.startsWith("/desk/queue");
   const statusParam = searchParams.get("status") ?? "";
@@ -336,9 +345,15 @@ function Sidebar({
   // Admins land on /desk/admin — Home must take them there, not to the agent
   // board (/desk), otherwise the click looks dead when already on /desk.
   const onAdminRouteEarly = pathname.startsWith("/desk/admin");
+  // NOTE: TanStack Link needs an explicit `search` object when leaving a
+  // `validateSearch` route (/desk/queue). With `search` undefined the
+  // queue→desk transition is silently swallowed (click fires, zero console
+  // errors, URL never commits) — the queue schema defaults get materialized
+  // into the URL and the target route never matches. Explicit `search: {}`
+  // drops search at the boundary. Same lesson as the queueLinks comment.
   const overviewLink: SideLink = isAdmin
-    ? { to: "/desk/admin", label: "Home", icon: LayoutDashboard, count: tickets.length || undefined, active: onAdminRouteEarly && pathname === "/desk/admin" }
-    : { to: "/desk", label: "Overview", icon: LayoutDashboard, count: tickets.length || undefined, active: onBoard };
+    ? { to: "/desk/admin", search: {}, label: "Home", icon: LayoutDashboard, count: tickets.length || undefined, active: onAdminRouteEarly && pathname === "/desk/admin" }
+    : { to: "/desk", search: {}, label: "Overview", icon: LayoutDashboard, count: tickets.length || undefined, active: onBoard };
   const views: SideLink[] = [
     { to: "/desk/queue", search: { tab: "mine" }, label: "My Tickets", icon: UserRound, count: mine || undefined, active: unfilteredQueue && tab === "mine" },
   ];
@@ -367,13 +382,16 @@ function Sidebar({
 
   const adminLinks: SideLink[] = [
     { to: "/desk/admin", label: "Dashboard", icon: LayoutDashboard, active: pathname === "/desk/admin" || pathname === "/desk/admin/" },
-    { to: "/desk/admin/admins", label: "Admin", icon: ShieldCheck, active: pathname.startsWith("/desk/admin/admins") },
+    { to: "/desk/admin/admins", label: "Admins", icon: ShieldCheck, active: pathname.startsWith("/desk/admin/admins") },
     { to: "/desk/admin/agents", label: "Agents", icon: Users, active: pathname.startsWith("/desk/admin/agents") },
     { to: "/desk/admin/audit", label: "Audit", icon: History, active: pathname.startsWith("/desk/admin/audit") },
     { to: "/desk/admin/known-issues", label: "Known issues", icon: TriangleAlert, active: pathname.startsWith("/desk/admin/known-issues") },
     { to: "/desk/admin/settings", label: "Settings", icon: Settings, active: pathname.startsWith("/desk/admin/settings") },
   ];
-  const onAdminRoute = pathname.startsWith("/desk/admin");
+  // NOTE (lead): "/" is a role-based landing (see routes/index.tsx +
+  // landingForRole) — for admins it redirects straight back to /desk/admin,
+  // so a "Site home → /" link would look just as dead. No such link: desk
+  // Home *is* /desk/admin for admins.
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -433,13 +451,12 @@ function Sidebar({
                     </Link>
                   </DropdownMenuItem>
                 )}
-                <DropdownMenuItem asChild>
-                  <Link to="/tickets/new">
-                    <TicketIcon aria-hidden /> Report an issue
-                  </Link>
+                <DropdownMenuItem onSelect={() => setReportOpen(true)}>
+                  <TicketIcon aria-hidden /> Report an issue
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            <ReportIssueSheet open={reportOpen} onOpenChange={setReportOpen} />
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -465,22 +482,32 @@ function Sidebar({
 
         {collapsed ? (
           <div className="flex flex-col items-center gap-1">
-            <span aria-hidden className="mb-1 h-px w-8 bg-ink-700" />
-            {queueLinks.map((link) => (
-              <SideLinkRow key={link.label} link={link} collapsed />
-            ))}
-            <span aria-hidden className="my-1 h-px w-8 bg-ink-700" />
-            {!isAdmin &&
-              views.map((link) => (
-                <SideLinkRow key={link.label} link={link} collapsed />
-              ))}
-            {isAdmin && (
-              <SideLinkRow
-                link={{ to: "/desk/admin", label: "Administration", icon: ShieldCheck, active: onAdminRoute }}
-                collapsed
-              />
+            {layer === "admin" ? (
+              <>
+                <span aria-hidden className="mb-1 h-px w-8 bg-ink-700" />
+                {adminLinks.map((link) => (
+                  <SideLinkRow key={link.label} link={link} collapsed />
+                ))}
+              </>
+            ) : (
+              <>
+                <span aria-hidden className="mb-1 h-px w-8 bg-ink-700" />
+                {queueLinks.map((link) => (
+                  <SideLinkRow key={link.label} link={link} collapsed />
+                ))}
+                <span aria-hidden className="my-1 h-px w-8 bg-ink-700" />
+                {!isAdmin &&
+                  views.map((link) => (
+                    <SideLinkRow key={link.label} link={link} collapsed />
+                  ))}
+                {isAdmin && (
+                  <SideLinkRow
+                    link={{ to: "/desk/admin", search: {}, label: "Administration", icon: ShieldCheck, active: onAdminRoute }}
+                    collapsed
+                  />
+                )}
+              </>
             )}
-            
           </div>
         ) : loading ? (
           <div className="flex flex-col gap-2 px-1" aria-label="Loading navigation">
@@ -495,14 +522,9 @@ function Sidebar({
               <div className="flex flex-col gap-6 px-1">
                 {isAdmin && (
                   <div className="flex flex-col gap-1">
-                    <ActionRow
-                      icon={ShieldCheck}
-                      label="Administration"
-                      hint="Open admin settings"
+                    <SideLinkRow
+                      link={{ to: "/desk/admin", search: {}, label: "Administration", icon: ShieldCheck, active: onAdminRoute }}
                       collapsed={collapsed}
-                      active={onAdminRoute}
-                      onClick={() => setLayer("admin")}
-                      trailing={<span aria-hidden className="text-fog">›</span>}
                     />
                     <Separator />
                   </div>
@@ -524,13 +546,11 @@ function Sidebar({
               </div>
             ) : (
               <div className="flex flex-col gap-3 px-1">
-                {/* Back link (Carrot `Sidebar.BackLink`). */}
-                <ActionRow
-                  icon={ArrowLeft}
-                  label="Go back"
-                  hint="Back to ticket views"
+                {/* Back link (Carrot `Sidebar.BackLink`) — real navigation to
+                    the queue, not local state, so it survives refresh. */}
+                <SideLinkRow
+                  link={{ to: "/desk/queue", search: { tab: "all" }, label: "Go back", icon: ArrowLeft, active: false }}
                   collapsed={collapsed}
-                  onClick={() => setLayer("main")}
                 />
                 <Separator />
                 <div className="flex flex-col gap-0.5" role="group" aria-label="Administration">

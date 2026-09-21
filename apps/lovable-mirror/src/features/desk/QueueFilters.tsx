@@ -80,13 +80,19 @@ export function QueueFilters({ agents, isAdmin = false }: { agents: Assignee[]; 
   }, [searchParams]);
 
   // Admins have no Mine tab — bounce them to All so URL, tabs, and data agree.
+  // Guarded to the queue route: while navigating AWAY (e.g. queue -> /desk/admin
+  // via the Administration link) the new location momentarily has no search, so
+  // params.tab falls back to "mine" and an unguarded bounce would push right back
+  // to /desk/queue?tab=all, cancelling the admin navigation (dead click).
+  const pathname = location.pathname;
   useEffect(() => {
     if (!isAdmin || params.tab !== "mine") return;
+    if (!pathname.startsWith("/desk/queue")) return;
     const next = readQueueParams(new URLSearchParams(window.location.search));
     next.tab = "all";
     pendingRef.current = next;
     navigate({ to: `/desk/queue${queueQueryString(next)}` });
-  }, [isAdmin, params.tab, navigate]);
+  }, [isAdmin, params.tab, pathname, navigate]);
 
   function push(next: QueueParams) {
     pendingRef.current = next;

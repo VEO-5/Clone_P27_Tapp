@@ -3,6 +3,8 @@
 
 import { useState } from "react";
 
+import { toast } from "sonner";
+
 import { UserAvatar } from "@/components/UserAvatar";
 import { Badge } from "@/components/shadcn/badge";
 import { Button } from "@/components/shadcn/button";
@@ -45,12 +47,16 @@ export function AgentTable({ initialAgents }: { initialAgents: MockAgent[] }) {
   const [notice, setNotice] = useState<string | null>(null);
 
   async function deactivate(agent: MockAgent) {
-    const updated = await apiFetch<MockAgent>(`/admin/agents/${agent.id}`, { method: "DELETE" });
-    // Journal the removal so a refresh can't resurrect the account.
-    recordMockDirectory({ role: "agent", email: updated.email, name: updated.name, status: updated.status });
-    setAgents((list) => list.map((item) => (item.id === agent.id ? updated : item)));
-    setConfirming(null);
-    setNotice(`${agent.email} deactivated — their ${agent.openTickets} open tickets were released to Pending.`);
+    try {
+      const updated = await apiFetch<MockAgent>(`/admin/agents/${agent.id}`, { method: "DELETE" });
+      // Journal the removal so a refresh can't resurrect the account.
+      recordMockDirectory({ role: "agent", email: updated.email, name: updated.name, status: updated.status });
+      setAgents((list) => list.map((item) => (item.id === agent.id ? updated : item)));
+      setConfirming(null);
+      setNotice(`${agent.email} deactivated — their ${agent.openTickets} open tickets were released to Pending.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't deactivate this agent.");
+    }
   }
 
   return (

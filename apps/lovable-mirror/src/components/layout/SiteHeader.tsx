@@ -1,5 +1,7 @@
 import { Link, useLocation } from "@tanstack/react-router";
+import { useState } from "react";
 
+import { ReportIssueSheet } from "@/features/tickets/ReportIssueSheet";
 import { cn, initials } from "@/lib/utils";
 
 const NAV_BY_ROLE = {
@@ -52,6 +54,7 @@ export function SiteHeader({
 }) {
   const pathname = useLocation().pathname;
   const NAV = NAV_BY_ROLE[role];
+  const [reportOpen, setReportOpen] = useState(false);
 
   // The desk is a full app shell — sidebar owns the logo, topbar owns utilities.
   // (Admin lives inside the desk shell, so /desk covers it too.)
@@ -77,27 +80,41 @@ export function SiteHeader({
 
         <div className="flex items-center gap-6">
           <nav aria-label="Primary" className="flex items-center gap-6">
-            {NAV.map((item) => (
-              <Link
-                key={item.to}
-                to={item.to}
-                aria-current={isActive(item.to) ? "page" : undefined}
-                className={cn(
-                  "group relative py-1 font-display text-[13px] transition-colors",
-                  isActive(item.to) ? "text-pearl" : "text-mist hover:text-pearl",
-                )}
-              >
-                <span className="hidden sm:inline">{item.label}</span>
-                <span className="sm:hidden">{item.label.split(" ")[0]}</span>
-                <span
+            {NAV.map((item) =>
+              item.to === "/tickets/new" ? (
+                <button
+                  key={item.to}
+                  type="button"
+                  onClick={() => setReportOpen(true)}
+                  className="group relative cursor-pointer py-1 font-display text-[13px] text-mist transition-colors hover:text-pearl"
+                >
+                  <span className="hidden sm:inline">{item.label}</span>
+                  <span className="sm:hidden">{item.label.split(" ")[0]}</span>
+                  <span className="absolute -bottom-1 left-0 h-0.5 w-0 bg-iris-500 transition-all duration-200 group-hover:w-full" />
+                </button>
+              ) : (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  aria-current={isActive(item.to) ? "page" : undefined}
                   className={cn(
-                    "absolute -bottom-1 left-0 h-0.5 bg-iris-500 transition-all duration-200",
-                    isActive(item.to) ? "w-full" : "w-0 group-hover:w-full",
+                    "group relative py-1 font-display text-[13px] transition-colors",
+                    isActive(item.to) ? "text-pearl" : "text-mist hover:text-pearl",
                   )}
-                />
-              </Link>
-            ))}
+                >
+                  <span className="hidden sm:inline">{item.label}</span>
+                  <span className="sm:hidden">{item.label.split(" ")[0]}</span>
+                  <span
+                    className={cn(
+                      "absolute -bottom-1 left-0 h-0.5 bg-iris-500 transition-all duration-200",
+                      isActive(item.to) ? "w-full" : "w-0 group-hover:w-full",
+                    )}
+                  />
+                </Link>
+              ),
+            )}
           </nav>
+          <ReportIssueSheet open={reportOpen} onOpenChange={setReportOpen} />
 
           {employeeEmail && (
             <span className="hidden items-center gap-2 lg:flex">
