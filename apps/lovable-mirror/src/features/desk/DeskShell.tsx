@@ -12,6 +12,7 @@ import {
   LayoutDashboard,
   LogOut,
   PanelLeft,
+  Pencil,
   Settings,
   ShieldCheck,
   Ticket as TicketIcon,
@@ -42,9 +43,11 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/shadcn/tooltip";
+import { EditProfileDialog } from "@/features/auth/EditProfileDialog";
 import { useSession, useSignOut } from "@/features/auth/useSession";
 import { ReportIssueSheet } from "@/features/tickets/ReportIssueSheet";
 import { apiFetch } from "@/lib/api";
+import { config } from "@/lib/config";
 import { cn } from "@/lib/utils";
 
 const COLLAPSED_KEY = "desk-sidebar-collapsed";
@@ -195,6 +198,7 @@ function SidebarFooter({ collapsed }: { collapsed: boolean }) {
   const session = useSession();
   const signOut = useSignOut();
   const [reportOpen, setReportOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   if (!session.data) {
     return (
@@ -274,6 +278,11 @@ function SidebarFooter({ collapsed }: { collapsed: boolean }) {
             <DropdownMenuItem onSelect={() => setReportOpen(true)}>
               <TicketIcon aria-hidden /> Report an issue
             </DropdownMenuItem>
+            {!config.apiMock && (
+              <DropdownMenuItem onSelect={() => setProfileOpen(true)}>
+                <Pencil aria-hidden /> Edit profile
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => void signOut()}>
               <LogOut aria-hidden /> Sign out
@@ -281,6 +290,9 @@ function SidebarFooter({ collapsed }: { collapsed: boolean }) {
           </DropdownMenuContent>
         </DropdownMenu>
         <ReportIssueSheet open={reportOpen} onOpenChange={setReportOpen} />
+        {!config.apiMock && (
+          <EditProfileDialog open={profileOpen} onOpenChange={setProfileOpen} profile={session.data} />
+        )}
       </div>
     </div>
   );

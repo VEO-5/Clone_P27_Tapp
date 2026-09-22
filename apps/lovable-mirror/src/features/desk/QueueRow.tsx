@@ -37,6 +37,7 @@ export function QueueRow({
   const { canClaim, canRelease, canAssign, isTerminal } = useOwnership(ticket, role);
   const resolvedCategoryName = useCategoryName(ticket.categoryId);
   const requester = ticket.requesterName ?? "Employee";
+  const requesterMail = ticket.requesterEmail ?? requesterEmail(requester);
   const hint = ownershipHint(ticket);
 
   return (
@@ -67,10 +68,10 @@ export function QueueRow({
 
       {/* User: avatar + name + company email */}
       <div className="mt-3 flex items-center gap-3">
-        <UserAvatar email={requesterEmail(requester)} name={requester} className="size-10" />
+        <UserAvatar email={requesterMail} name={requester} avatarUrl={ticket.requesterAvatarUrl ?? null} className="size-10" />
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-pearl">{requester}</p>
-          <p className="truncate text-xs text-fog">{requesterEmail(requester)}</p>
+          <p className="truncate text-xs text-fog">{requesterMail}</p>
         </div>
       </div>
 

@@ -26,6 +26,10 @@ const CHANNEL_ICONS: ComponentType<{ className?: string }>[] = [Mail];
 export function TicketKanbanCard({ ticket }: { ticket: DeskTicket }) {
   const ChannelIcon = CHANNEL_ICONS[0]!;
   const displayName = ticket.assignee?.name ?? ticket.requesterName ?? "Employee";
+  // Avatar identity follows the displayed person: assignee avatar when
+  // assigned, otherwise the real requester email/avatar from the API.
+  const displayEmail = ticket.assignee ? displayName : (ticket.requesterEmail ?? displayName);
+  const displayAvatarUrl = ticket.assignee?.avatarUrl ?? ticket.requesterAvatarUrl ?? null;
   const resolvedCategoryName = useCategoryName(ticket.categoryId);
 
   return (
@@ -63,6 +67,8 @@ export function TicketKanbanCard({ ticket }: { ticket: DeskTicket }) {
         <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1.5">
           <UserAvatar
             name={displayName}
+            email={displayEmail}
+            avatarUrl={displayAvatarUrl}
             className="size-5"
             fallbackClassName="bg-ink-900 text-[8px] font-semibold text-mist"
           />

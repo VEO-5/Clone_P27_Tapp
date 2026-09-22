@@ -219,6 +219,8 @@ export type SlaInfo = z.infer<typeof SlaInfo>;
 
 export const DeskTicket = Ticket.extend({
   requesterName: z.string().optional(),
+  requesterEmail: z.string().email().optional(),
+  requesterAvatarUrl: z.string().url().nullable().optional(),
   assignee: Assignee.nullable().optional(),
   lock: LockInfo.optional(),
   previousRelease: PreviousRelease.nullable().optional(),

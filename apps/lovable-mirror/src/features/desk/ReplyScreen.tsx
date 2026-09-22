@@ -194,7 +194,7 @@ export function ReplyScreen({ id }: { id: string }) {
           <PanelHeader
             eyebrow={ticket.reference}
             title={ticket.title}
-            description={`${ticket.requesterName ?? "Employee"} · ${resolvedCategoryName} · Submitted ${formatDateTime(ticket.createdAt)}`}
+            description={`${ticket.requesterName ?? "Employee"}${ticket.requesterEmail ? ` · ${ticket.requesterEmail}` : ""} · ${resolvedCategoryName} · Submitted ${formatDateTime(ticket.createdAt)}`}
             className="lg:sticky lg:top-0 lg:z-10 lg:rounded-t-[4px] lg:bg-white"
             action={
               <div className="flex flex-wrap items-center gap-2">

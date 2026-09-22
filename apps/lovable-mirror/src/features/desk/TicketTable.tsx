@@ -79,10 +79,12 @@ export function TicketPriorityDot({ priority }: { priority: DeskTicket["priority
 
 export function UserCell({ ticket }: { ticket: DeskTicket }) {
   const name = ticket.requesterName ?? "Employee";
-  const email = requesterEmail(name);
+  // Prefer the real requester email from the API; the derived address is a
+  // last-resort fallback for mock/legacy rows without one.
+  const email = ticket.requesterEmail ?? requesterEmail(name);
   return (
     <div className="flex items-center gap-2">
-      <UserAvatar email={email} name={name} className="size-8" />
+      <UserAvatar email={email} name={name} avatarUrl={ticket.requesterAvatarUrl ?? null} className="size-8" />
       <div className="min-w-0">
         <p className="truncate text-[14px] font-semibold text-black">{name}</p>
         <p className="truncate text-[12px] text-black/60">{email}</p>

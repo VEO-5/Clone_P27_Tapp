@@ -226,6 +226,26 @@ export default async function (req: Request): Promise<Response> {
     | undefined;
   if (userError || !user?.id) return UNAUTH(req);
 
+  /** Best display name from the auth provider (Google) — null for OTP-only users. */
+  function authDisplayName(): string | null {
+    const prof = user!.profile ?? {};
+    for (const key of ["name", "full_name", "display_name"]) {
+      const v = String(prof[key] ?? "").trim();
+      if (v) return v;
+    }
+    return null;
+  }
+
+  /** Best avatar URL from the auth provider — null when unavailable. */
+  function authAvatarUrl(): string | null {
+    const prof = user!.profile ?? {};
+    for (const key of ["avatar_url", "avatar", "picture", "photo"]) {
+      const v = String(prof[key] ?? "").trim();
+      if (v && /^https?:\/\//.test(v)) return v;
+    }
+    return null;
+  }
+
   async function profile(): Promise<DbProfile | null> {
     // deno-lint-ignore no-explicit-any
     const db = admin.database as any;
@@ -234,14 +254,47 @@ export default async function (req: Request): Promise<Response> {
       .select("id, email, name, avatar_url, role, team_id")
       .eq("id", user!.id)
       .maybeSingle();
-    if (data) return data as DbProfile;
+    if (data) {
+      const row = data as DbProfile;
+      // Self-heal placeholder identity: OTP auto-provision stores the email
+      // prefix as name and no avatar. Upgrade when the provider now carries
+      // better values. Best-effort — never block sign-in.
+      try {
+        const prefix = row.email.split("@")[0].toLowerCase();
+        // deno-lint-ignore no-explicit-any
+        const patch: Record<string, any> = {};
+        const betterName = authDisplayName();
+        if (
+          betterName &&
+          row.name.trim().toLowerCase() === prefix &&
+          betterName.trim().toLowerCase() !== prefix
+        ) {
+          patch.name = betterName;
+        }
+        const betterAvatar = authAvatarUrl();
+        if (betterAvatar && !row.avatar_url) {
+          patch.avatar_url = betterAvatar;
+        }
+        if (Object.keys(patch).length > 0) {
+          const { data: healed } = await db
+            .from("profiles")
+            .update(patch)
+            .eq("id", row.id)
+            .select("id, email, name, avatar_url, role, team_id")
+            .single();
+          if (healed) return healed as DbProfile;
+        }
+      } catch {
+        // ignore — cosmetic only
+      }
+      return row;
+    }
     // Auto-provision on first login. Work domain only (matches /auth/resolve).
     const email = String(user!.email ?? "").toLowerCase();
     if (!email.endsWith("@pearl27.com")) {
       return null;
     }
-    const name =
-      String(user!.profile?.["name"] ?? "") || email.split("@")[0];
+    const name = authDisplayName() ?? email.split("@")[0];
     // Straight-to-Desk: an admin invite stored in role_invites claims the
     // invited role on first login (single-use). No invite -> employee.
     // Invite lookup failure must never block sign-in -> fall back to employee.
@@ -261,7 +314,13 @@ export default async function (req: Request): Promise<Response> {
     }
     const { data: created } = await db
       .from("profiles")
-      .insert([{ id: user!.id, email, name, role: firstRole }])
+      .insert([{
+        id: user!.id,
+        email,
+        name,
+        avatar_url: authAvatarUrl(),
+        role: firstRole,
+      }])
       .select("id, email, name, avatar_url, role, team_id")
       .single();
     if (created && firstRole !== "employee") {
@@ -294,6 +353,59 @@ export default async function (req: Request): Promise<Response> {
     return json(req, toProfile(p));
   }
 
+  // PATCH /auth/me — update your own display name / photo. Email, role, and
+  // team stay server-managed (role changes go through the admin endpoints).
+  if ((req.method === "PATCH" || req.method === "PUT") && path === "/auth/me") {
+    const self = await profile();
+    if (!self) return UNAUTH(req);
+    const fieldErrors: Record<string, string> = {};
+    // deno-lint-ignore no-explicit-any
+    const patch: Record<string, any> = {};
+    if ("name" in body) {
+      const name = String(body.name ?? "").trim().replace(/\s+/g, " ");
+      if (name.length < 2) fieldErrors.name = "Use at least 2 characters";
+      else if (name.length > 60) fieldErrors.name = "Keep it to 60 characters or fewer";
+      else patch.name = name;
+    }
+    if ("avatarUrl" in body) {
+      const raw = body.avatarUrl;
+      if (raw === null || raw === "") {
+        patch.avatar_url = null;
+      } else if (typeof raw !== "string") {
+        fieldErrors.avatarUrl = "Photo must be a URL or empty";
+      } else {
+        const url = raw.trim();
+        if (url.length > 500) fieldErrors.avatarUrl = "That URL is too long";
+        else if (!/^https:\/\//.test(url)) {
+          fieldErrors.avatarUrl = "Photo must be an https:// URL";
+        } else {
+          patch.avatar_url = url;
+        }
+      }
+    }
+    if (Object.keys(fieldErrors).length > 0) {
+      return err(req, 422, "VALIDATION_FAILED", "Check your profile details.", {
+        fieldErrors,
+      });
+    }
+    if (Object.keys(patch).length === 0) {
+      return err(req, 422, "VALIDATION_FAILED", "Nothing to update.", {
+        fieldErrors: { name: "Change your name or photo" },
+      });
+    }
+    const meDb = admin.database as any;
+    const { data: updated, error: upError } = await meDb
+      .from("profiles")
+      .update(patch)
+      .eq("id", self.id)
+      .select("id, email, name, avatar_url, role, team_id")
+      .single();
+    if (upError || !updated) {
+      return err(req, 500, "DB_ERROR", "Couldn't save your profile.");
+    }
+    return json(req, toProfile(updated as DbProfile));
+  }
+
   // Every route below needs a provisioned profile.
   const p = await profile();
   if (!p) {
@@ -318,6 +430,58 @@ export default async function (req: Request): Promise<Response> {
       .eq("id", id)
       .maybeSingle();
     return (data as DbTicket) ?? null;
+  }
+
+  interface RequesterInfo {
+    name: string;
+    email: string;
+    avatar_url: string | null;
+  }
+
+  /**
+   * Batched requester lookup for desk responses. One IN query per call —
+   * never per-row — mapping ticket.requester_id -> profiles row.
+   * Missing profiles stay absent so the frontend keeps its "Employee"
+   * fallback instead of rendering a broken identity.
+   */
+  async function requesterMap(
+    ids: string[],
+  ): Promise<Map<string, RequesterInfo>> {
+    const out = new Map<string, RequesterInfo>();
+    const unique = [...new Set(ids.filter(Boolean))];
+    if (unique.length === 0) return out;
+    try {
+      const { data } = await db
+        .from("profiles")
+        .select("id, name, email, avatar_url")
+        .in("id", unique);
+      for (const r of (data as (RequesterInfo & { id: string })[]) ?? []) {
+        out.set(r.id, { name: r.name, email: r.email, avatar_url: r.avatar_url });
+      }
+    } catch {
+      // ignore — callers fall back gracefully
+    }
+    return out;
+  }
+
+  /** Base ticket shape plus real requester identity for desk consumers. */
+  async function toDeskTickets(rows: DbTicket[]) {
+    const people = await requesterMap(rows.map((t) => t.requester_id));
+    return rows.map((t) => {
+      const base = toTicket(t);
+      const who = people.get(t.requester_id);
+      if (!who) return base;
+      return {
+        ...base,
+        requesterName: who.name,
+        requesterEmail: who.email,
+        requesterAvatarUrl: who.avatar_url,
+      };
+    });
+  }
+
+  async function toDeskTicket(t: DbTicket) {
+    return (await toDeskTickets([t]))[0];
   }
 
   // -- POST /tickets ----------------------------------------------------------
@@ -596,7 +760,7 @@ export default async function (req: Request): Promise<Response> {
     if (error) return err(req, 500, "DB_ERROR", "Couldn't load the queue.");
     const rows = (data as DbTicket[]) ?? [];
     return json(req, {
-      items: rows.map(toTicket),
+      items: await toDeskTickets(rows),
       nextCursor: rows.length === limit ? String(cursor + limit) : null,
     });
   }
@@ -614,7 +778,7 @@ export default async function (req: Request): Promise<Response> {
           db.from("attachments").select("id, ticket_id, file_name, mime_type, size_bytes, created_at").eq("ticket_id", t.id).limit(20),
         ]);
       return json(req, {
-        ticket: toTicket(t),
+        ticket: await toDeskTicket(t),
         events: ((events ?? []) as Record<string, unknown>[]).map((e) => ({
           id: e["id"], ticketId: e["ticket_id"], type: e["type"], message: e["message"], actor: e["actor"], createdAt: e["created_at"],
         })),
@@ -660,7 +824,7 @@ export default async function (req: Request): Promise<Response> {
       await db.from("ticket_events").insert([{
         ticket_id: t.id, type: "assigned", message: `${p.name} claimed the ticket`, actor: "support",
       }]);
-      return json(req, toTicket(data as DbTicket));
+      return json(req, await toDeskTicket(data as DbTicket));
     }
   }
 
@@ -695,7 +859,7 @@ export default async function (req: Request): Promise<Response> {
         message: reason ? `${p.name} released the ticket — ${reason}` : `${p.name} released the ticket`,
         actor: "support",
       }]);
-      return json(req, toTicket(data as DbTicket));
+      return json(req, await toDeskTicket(data as DbTicket));
     }
   }
 
@@ -730,7 +894,7 @@ export default async function (req: Request): Promise<Response> {
       await db.from("ticket_events").insert([{
         ticket_id: t.id, type: "assigned", message: `${p.name} assigned the ticket`, actor: "support",
       }]);
-      return json(req, toTicket(data as DbTicket));
+      return json(req, await toDeskTicket(data as DbTicket));
     }
   }
 
@@ -801,7 +965,7 @@ export default async function (req: Request): Promise<Response> {
           message: `Status changed to ${status}`, actor: "support",
         }]);
       }
-      return json(req, toTicket(updated as DbTicket));
+      return json(req, await toDeskTicket(updated as DbTicket));
     }
   }
 
