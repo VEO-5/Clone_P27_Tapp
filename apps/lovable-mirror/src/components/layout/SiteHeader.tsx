@@ -8,12 +8,12 @@ import { cn } from "@/lib/utils";
 const NAV_BY_ROLE = {
   employee: [
     { to: "/tickets", label: "My tickets" },
-    { to: "/tickets/new", label: "Report an issue" },
+    { to: "/tickets/new", label: "Submit a ticket" },
   ],
   agent: [
     { to: "/desk", label: "Dashboard" },
     { to: "/desk/queue", label: "Queue" },
-    { to: "/tickets/new", label: "Report an issue" },
+    { to: "/tickets/new", label: "Submit a ticket" },
   ],
   admin: [
     { to: "/desk", label: "Desk" },

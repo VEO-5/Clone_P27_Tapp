@@ -68,7 +68,7 @@ export default function TicketsDashboard() {
           <h1 className="mt-3 font-display text-4xl tracking-tight text-pearl">My tickets</h1>
         </div>
         <Button variant="outline" size="sm" onClick={() => setReportOpen(true)}>
-          Report an issue
+          Submit a ticket
           <ArrowRight className="size-3.5" aria-hidden />
         </Button>
         <ReportIssueSheet open={reportOpen} onOpenChange={setReportOpen} />
@@ -137,10 +137,10 @@ export default function TicketsDashboard() {
             tone="night"
             icon={<Inbox className="size-5" aria-hidden />}
             title="No tickets yet"
-            description="Submit a Sphere issue and it will land here with a live status."
+            description="Submit a ticket and it will land here with a live status."
             action={
               <Button onClick={() => setReportOpen(true)}>
-                Report an issue
+                Submit a ticket
               </Button>
             }
           />

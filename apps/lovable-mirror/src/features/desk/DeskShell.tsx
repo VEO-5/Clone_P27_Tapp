@@ -276,7 +276,7 @@ function SidebarFooter({ collapsed }: { collapsed: boolean }) {
               </DropdownMenuItem>
             )}
             <DropdownMenuItem onSelect={() => setReportOpen(true)}>
-              <TicketIcon aria-hidden /> Report an issue
+              <TicketIcon aria-hidden /> Submit a ticket
             </DropdownMenuItem>
             {!config.apiMock && (
               <DropdownMenuItem onSelect={() => setProfileOpen(true)}>
@@ -464,7 +464,7 @@ function Sidebar({
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuItem onSelect={() => setReportOpen(true)}>
-                  <TicketIcon aria-hidden /> Report an issue
+                  <TicketIcon aria-hidden /> Submit a ticket
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
