@@ -36,8 +36,10 @@ export function TicketForm({
     session,
     values,
     set,
-    files,
-    handleFilesChange,
+    fileItems,
+    rejectedFiles,
+    addFiles,
+    removeFile,
     errors,
     formError,
     submitting,
@@ -164,7 +166,13 @@ export function TicketForm({
           </Field>
 
           <Field htmlFor="files" label="Screenshots or files" error={errors.files} className="mt-1">
-            <UploadZone files={files} onChange={handleFilesChange} disabled={submitting} />
+            <UploadZone
+              items={fileItems}
+              rejected={rejectedFiles}
+              onAdd={addFiles}
+              onRemove={removeFile}
+              disabled={submitting}
+            />
           </Field>
         </div>
 
