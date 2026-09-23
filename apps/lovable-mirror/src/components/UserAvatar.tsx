@@ -1,17 +1,19 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Avatar, AvatarFallback } from "@/components/shadcn/avatar";
-import { resolveUserAvatar } from "@/lib/shadows";
+import { resolveUserAvatar, resolveUserAvatarFallback } from "@/lib/shadows";
 import { cn, initials } from "@/lib/utils";
 
 /**
  * Shared avatar for the whole app — queue table, cards, admin tables, headers.
  *
- * - Prefers `avatarUrl` (upload / future backend Gravatar-from-email).
- * - Falls back to self-hosted Shadows Duotone seeded by email.
- * - Initials stay as Radix fallback for loading / error / a11y.
+ * Chain (same for Google + email/OTP sign-ins):
+ *  1. `avatarUrl` (upload / Google photo from GET /auth/me)
+ *  2. Gravatar photo linked to the email
+ *  3. self-hosted Shadows Duotone seeded by email
+ *  4. initials (when every image errors)
  */
 export function UserAvatar({
   email,
@@ -29,21 +31,35 @@ export function UserAvatar({
   fallbackClassName?: string;
 }) {
   const label = (name ?? email ?? "Employee").trim() || "Employee";
-  const src = useMemo(
+  const primary = useMemo(
     () => resolveUserAvatar({ email, name, avatarUrl }),
     [email, name, avatarUrl],
   );
-  const [failed, setFailed] = useState(false);
+  const fallbackSrc = useMemo(
+    () => resolveUserAvatarFallback({ email, name }),
+    [email, name],
+  );
+  // Staged chain: 0 = avatarUrl/Gravatar, 1 = Shadows, 2 = initials only.
+  // Gravatar 404s (d=404) when the email has no Gravatar — advance one stage
+  // per error. Shadows is a data-URI and never errors, so stage 1 sticks.
+  const [stage, setStage] = useState(0);
+  useEffect(() => {
+    setStage(0);
+  }, [primary, fallbackSrc]);
+  const showImage = stage < 2;
+  const src = stage === 0 ? primary : fallbackSrc;
 
   return (
     <Avatar className={cn("shrink-0", className)} aria-label={label}>
-      {!failed && (
+      {showImage && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
+          key={src}
           src={src}
           alt=""
           loading="lazy"
-          onError={() => setFailed(true)}
+          referrerPolicy="no-referrer"
+          onError={() => setStage((s) => s + 1)}
           className={cn("aspect-square size-full object-cover", imageClassName)}
         />
       )}

@@ -89,7 +89,7 @@ export function AdminTable({ initialAdmins }: { initialAdmins: MockAgent[] }) {
               <TableRow key={admin.id}>
                 <TableCell>
                   <span className="flex items-center gap-3">
-                    <UserAvatar email={admin.email} name={admin.name} className="size-8" />
+                    <UserAvatar email={admin.email} name={admin.name} avatarUrl={admin.avatarUrl ?? null} className="size-8" />
                     <span className="min-w-0">
                       <span className="block truncate font-medium">{admin.name}</span>
                       <span className="block truncate text-xs text-muted-foreground">{admin.email}</span>

@@ -1,8 +1,9 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import { useState } from "react";
 
+import { UserAvatar } from "@/components/UserAvatar";
 import { ReportIssueSheet } from "@/features/tickets/ReportIssueSheet";
-import { cn, initials } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 const NAV_BY_ROLE = {
   employee: [
@@ -26,29 +27,20 @@ const NAV_BY_ROLE = {
 } as const;
 
 /**
- * MIRROR avatar: initials circle with the same footprint as UserAvatar's
- * Radix fallback. The dicebear/ Radix avatar lands with the component port;
- * identity + layout are what this slice proves.
+ * Employee identity in the header — the shared UserAvatar chain
+ * (upload / Google photo → Gravatar for the email → generated fallback),
+ * kept at the same size-7 footprint as the old initials circle.
  */
-function EmployeeAvatar({ email }: { email: string }) {
-  return (
-    <span
-      aria-label={email}
-      className="flex size-7 shrink-0 items-center justify-center rounded-full border border-ink-700 bg-pearl text-[10px] font-semibold text-cream"
-    >
-      {initials(email)}
-    </span>
-  );
-}
-
 export function SiteHeader({
   employeeEmail,
+  employeeName,
+  employeeAvatarUrl,
   role = "signedOut",
   action,
   hideNav = false,
 }: {
   employeeEmail?: string | null;
-  /** Accepted for signature parity; the dicebear avatar lands on arrival. */
+  employeeName?: string | null;
   employeeAvatarUrl?: string | null;
   role?: keyof typeof NAV_BY_ROLE;
   action?: React.ReactNode;
@@ -122,7 +114,13 @@ export function SiteHeader({
 
           {employeeEmail && (
             <span className="hidden items-center gap-2 lg:flex">
-              <EmployeeAvatar email={employeeEmail} />
+              <UserAvatar
+                email={employeeEmail}
+                name={employeeName ?? employeeEmail}
+                avatarUrl={employeeAvatarUrl ?? null}
+                className="size-7 border border-ink-700"
+                fallbackClassName="bg-pearl text-[10px] font-semibold text-cream"
+              />
               <p
                 className="max-w-[10rem] truncate font-mono text-[10px] text-fog"
                 title={employeeEmail}

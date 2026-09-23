@@ -89,7 +89,7 @@ export function AgentTable({ initialAgents }: { initialAgents: MockAgent[] }) {
               <TableRow key={agent.id}>
                 <TableCell>
                   <span className="flex items-center gap-3">
-                    <UserAvatar email={agent.email} name={agent.name} className="size-8" />
+                    <UserAvatar email={agent.email} name={agent.name} avatarUrl={agent.avatarUrl ?? null} className="size-8" />
                     <span className="min-w-0">
                       <span className="block truncate font-medium">{agent.name}</span>
                       <span className="block truncate text-xs text-muted-foreground">{agent.email}</span>

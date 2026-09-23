@@ -4,6 +4,8 @@ import { Avatar, Style } from "@dicebear/core";
 import type { StyleDefinition } from "@dicebear/core";
 import definition from "@dicebear/styles/shadows.json" with { type: "json" };
 
+import { gravatarUrlForEmail } from "@/lib/gravatar";
+
 /**
  * Shadows "Duotone" preset — one indigo ink on its own pale tint.
  * Self-hosted via @dicebear/core + @dicebear/styles (no api.dicebear.com call).
@@ -45,12 +47,11 @@ export function shadowsAvatarUri(seed: string): string {
 /**
  * Single avatar resolution point for the whole app.
  *
- * Order (production-ready, Gravatar-ready):
- *  1. explicit avatarUrl (profile pic upload, or backend-supplied Gravatar from email on go-live)
- *  2. self-hosted Shadows Duotone fallback seeded by email
- *
- * When we go live, backend populates `avatarUrl` from the user's email
- * (e.g. Gravatar `.../avatar/<md5>?d=404`) — no UI changes needed.
+ * Order (applies to Google + email/OTP sign-ins, everywhere):
+ *  1. explicit avatarUrl (upload, or Google photo backfilled by GET /auth/me)
+ *  2. Gravatar photo linked to the email (`d=404` so missing photos error out)
+ *  3. self-hosted Shadows Duotone fallback seeded by email
+ *  4. initials (rendered by UserAvatar when every image errors)
  */
 export function resolveUserAvatar({
   email,
@@ -62,5 +63,20 @@ export function resolveUserAvatar({
   avatarUrl?: string | null;
 }): string {
   if (avatarUrl) return avatarUrl;
+  return gravatarUrlForEmail(email) ?? shadowsAvatarUri(avatarSeed(email, name));
+}
+
+/**
+ * Guaranteed-local fallback for stage 2 of the UserAvatar chain.
+ * The Gravatar URL above 404s when the email has no Gravatar — UserAvatar
+ * swaps to this Shadows URI on error, which never needs the network.
+ */
+export function resolveUserAvatarFallback({
+  email,
+  name,
+}: {
+  email?: string | null;
+  name?: string | null;
+}): string {
   return shadowsAvatarUri(avatarSeed(email, name));
 }

@@ -20,6 +20,7 @@ export function SessionHeader() {
     <SiteHeader
       role={role === "employee" || role === "agent" || role === "admin" ? role : "signedOut"}
       employeeEmail={session.data?.email ?? null}
+      employeeName={session.data?.name ?? null}
       employeeAvatarUrl={session.data?.avatarUrl ?? null}
       action={session.data ? <SignOutButton /> : undefined}
     />
