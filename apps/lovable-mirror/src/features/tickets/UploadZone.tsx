@@ -5,11 +5,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   ACCEPT_ATTRIBUTE,
+  ALLOWED_MIME_TYPES,
   MAX_FILES,
   MAX_FILE_BYTES,
   formatBytes,
   validateFile,
 } from "@/lib/validation";
+import { MAX_PROCESS_BYTES, isCompressibleImage } from "@/lib/image-compress";
 import { cn } from "@/lib/utils";
 
 export interface UploadZoneProps {
@@ -27,6 +29,7 @@ export function UploadZone({ files, onChange, disabled }: UploadZoneProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [rejected, setRejected] = useState<string[]>([]);
+  const [notices, setNotices] = useState<string[]>([]);
 
   // Object URLs must be revoked or the page leaks memory as files are swapped.
   const previews = useMemo(
@@ -50,6 +53,7 @@ export function UploadZone({ files, onChange, disabled }: UploadZoneProps) {
       if (!incoming || incoming.length === 0) return;
 
       const errors: string[] = [];
+      const infos: string[] = [];
       const accepted: File[] = [];
 
       for (const file of Array.from(incoming)) {
@@ -60,8 +64,19 @@ export function UploadZone({ files, onChange, disabled }: UploadZoneProps) {
 
         const error = validateFile(file);
         if (error) {
-          errors.push(error);
-          continue;
+          // Oversize still photo: accept it — it is downscaled to a
+          // triage-friendly JPEG at submit time instead of failing the cap.
+          if (
+            (ALLOWED_MIME_TYPES as readonly string[]).includes(file.type) &&
+            isCompressibleImage(file) &&
+            file.size > MAX_FILE_BYTES &&
+            file.size <= MAX_PROCESS_BYTES
+          ) {
+            infos.push(`${file.name} is large and will be compressed on submit`);
+          } else {
+            errors.push(error);
+            continue;
+          }
         }
 
         if (files.length + accepted.length >= MAX_FILES) {
@@ -72,6 +87,7 @@ export function UploadZone({ files, onChange, disabled }: UploadZoneProps) {
       }
 
       setRejected(errors);
+      setNotices(infos);
       if (accepted.length > 0) onChange([...files, ...accepted]);
     },
     [files, onChange],
@@ -79,6 +95,7 @@ export function UploadZone({ files, onChange, disabled }: UploadZoneProps) {
 
   const remove = (key: string) => {
     setRejected([]);
+    setNotices([]);
     onChange(
       files.filter((file) => `${file.name}-${file.size}-${file.lastModified}` !== key),
     );
@@ -147,7 +164,8 @@ export function UploadZone({ files, onChange, disabled }: UploadZoneProps) {
           )}
         </p>
         <p className="text-[11.5px] text-fog">
-          PNG, JPEG, WebP, GIF, PDF or TXT · up to {formatBytes(MAX_FILE_BYTES)} each
+          PNG, JPEG, WebP, GIF, PDF or TXT · up to {formatBytes(MAX_FILE_BYTES)} each · larger
+          photos are compressed automatically
         </p>
 
         <input
@@ -166,6 +184,16 @@ export function UploadZone({ files, onChange, disabled }: UploadZoneProps) {
           }}
         />
       </div>
+
+      {notices.length > 0 && (
+        <ul aria-live="polite" className="flex flex-col gap-1">
+          {notices.map((message) => (
+            <li key={message} className="text-[12.5px] text-fog">
+              {message}
+            </li>
+          ))}
+        </ul>
+      )}
 
       {rejected.length > 0 && (
         <ul aria-live="polite" className="flex flex-col gap-1">

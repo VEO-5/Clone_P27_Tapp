@@ -680,7 +680,7 @@ export default async function (req: Request): Promise<Response> {
       }
       const [{ data: events }, { data: attachments }, { data: assigneeProfile }] = await Promise.all([
         db.from("ticket_events").select("id, ticket_id, type, message, actor, created_at").eq("ticket_id", t.id).order("created_at", { ascending: true }).limit(100),
-        db.from("attachments").select("id, ticket_id, file_name, mime_type, size_bytes, created_at").eq("ticket_id", t.id).limit(20),
+        db.from("attachments").select("id, ticket_id, file_name, mime_type, size_bytes, status, created_at").eq("ticket_id", t.id).limit(20),
         t.assignee_id ? db.from("profiles").select("name, avatar_url").eq("id", t.assignee_id).maybeSingle() : Promise.resolve({ data: null } as never),
       ]);
       const handlingAgent = (assigneeProfile as { name?: string; avatar_url?: string | null } | null)?.name
@@ -693,8 +693,230 @@ export default async function (req: Request): Promise<Response> {
           id: e["id"], ticketId: e["ticket_id"], type: e["type"], message: e["message"], actor: e["actor"], createdAt: e["created_at"],
         })),
         attachments: ((attachments ?? []) as Record<string, unknown>[]).map((a) => ({
-          id: a["id"], ticketId: a["ticket_id"], fileName: a["file_name"], mimeType: a["mime_type"], sizeBytes: a["size_bytes"], status: "available", createdAt: a["created_at"],
+          id: a["id"], ticketId: a["ticket_id"], fileName: a["file_name"], mimeType: a["mime_type"], sizeBytes: a["size_bytes"], status: a["status"], createdAt: a["created_at"],
         })),
+      });
+    }
+  }
+
+  // -- attachments (presigned upload + short-lived download) -------------------
+  // The browser never holds storage credentials: presign mints a
+  // credential-free upload target via the storage upload-strategy, the
+  // browser PUTs/POSTs bytes straight to storage, then complete flips the
+  // row to available (confirming with storage when the strategy requires).
+  const ATTACH_BUCKET = "ticket-attachments";
+  const ATTACH_MAX_BYTES = 5 * 1024 * 1024;
+  const ATTACH_MAX_FILES = 5;
+  const ATTACH_ALLOWED_MIME = new Set([
+    "image/png",
+    "image/jpeg",
+    "image/webp",
+    "image/gif",
+    "application/pdf",
+    "text/plain",
+  ]);
+
+  function sanitizeFileName(raw: unknown): string {
+    const base = String(raw ?? "").split(/[\\/]/).pop() ?? "";
+    const clean = base
+      .replace(/[^a-zA-Z0-9._-]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 100);
+    return clean || "file";
+  }
+
+  /** Mirrors the frontend validateFile (UploadZone) so tampered clients fail here too. */
+  function attachFileError(fileName: string, mimeType: string, sizeBytes: number): string | null {
+    if (!ATTACH_ALLOWED_MIME.has(mimeType)) {
+      return `${fileName}: only PNG, JPEG, WebP, GIF, PDF, or TXT files are allowed`;
+    }
+    if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) return `${fileName} is empty`;
+    if (sizeBytes > ATTACH_MAX_BYTES) {
+      return `${fileName} is too large — the limit is 5 MB`;
+    }
+    return null;
+  }
+
+  // -- POST /tickets/:id/attachments/presign ---------------------------------
+  {
+    const m = path.match(/^\/tickets\/([^/]+)\/attachments\/presign$/);
+    if (req.method === "POST" && m) {
+      const t = await ticketById(decodeURIComponent(m[1]));
+      if (!t || (t.requester_id !== p.id && !isDesk)) {
+        return err(req, 404, "NOT_FOUND", "Ticket not found.");
+      }
+      const fileName = sanitizeFileName(body.fileName);
+      const mimeType = String(body.mimeType ?? "");
+      const sizeBytes = Number(body.sizeBytes ?? 0);
+      const fileError = attachFileError(fileName, mimeType, sizeBytes);
+      if (fileError) {
+        return err(req, 422, "VALIDATION_FAILED", "Check the highlighted fields.", {
+          fieldErrors: { file: fileError },
+        });
+      }
+      // Sweep stale attempts so a retried upload never leaves a permanent
+      // "scanning" ghost on the ticket.
+      try {
+        const cutoff = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+        await db.from("attachments").delete().eq("ticket_id", t.id).eq("status", "scanning").lt("created_at", cutoff);
+      } catch {
+        // ignore — cosmetic only
+      }
+      const { data: existing } = await db
+        .from("attachments")
+        .select("id")
+        .eq("ticket_id", t.id)
+        .limit(ATTACH_MAX_FILES + 1);
+      if (((existing as unknown[]) ?? []).length >= ATTACH_MAX_FILES) {
+        return err(req, 422, "VALIDATION_FAILED", "Check the highlighted fields.", {
+          fieldErrors: { file: `Attach at most ${ATTACH_MAX_FILES} files` },
+        });
+      }
+      const storageKey = `tickets/${t.id}/${crypto.randomUUID()}-${fileName}`;
+      let strategy: {
+        method?: string;
+        uploadUrl?: string;
+        fields?: Record<string, string>;
+        key?: string;
+        confirmRequired?: boolean;
+        confirmUrl?: string;
+      } | null = null;
+      try {
+        const res = await fetch(
+          `${BASE_URL}/api/storage/buckets/${ATTACH_BUCKET}/upload-strategy`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${API_KEY}`,
+            },
+            body: JSON.stringify({
+              filename: storageKey,
+              contentType: mimeType,
+              size: sizeBytes,
+            }),
+          },
+        );
+        if (!res.ok) throw new Error(`upload-strategy ${res.status}`);
+        strategy = (await res.json()) as typeof strategy;
+      } catch {
+        return err(
+          req,
+          503,
+          "UPLOAD_UNAVAILABLE",
+          "Uploads are unavailable right now. Your ticket was submitted — retry the file in a moment.",
+        );
+      }
+      if (strategy?.method !== "presigned" || !strategy.uploadUrl) {
+        return err(
+          req,
+          503,
+          "UPLOAD_UNAVAILABLE",
+          "Uploads are unavailable right now. Your ticket was submitted — retry the file in a moment.",
+        );
+      }
+      const { data: row, error: insError } = await db
+        .from("attachments")
+        .insert([{
+          ticket_id: t.id,
+          file_name: fileName,
+          mime_type: mimeType,
+          size_bytes: sizeBytes,
+          storage_key: strategy.key ?? storageKey,
+          status: "scanning",
+          confirm_url: strategy.confirmRequired && strategy.confirmUrl ? strategy.confirmUrl : null,
+        }])
+        .select("id")
+        .single();
+      if (insError || !row) return err(req, 500, "DB_ERROR", "Couldn't start the upload. Retry the file in a moment.");
+      return json(req, {
+        attachmentId: (row as { id: string }).id,
+        uploadUrl: strategy.uploadUrl,
+        method: strategy.fields ? "post" : "put",
+        fields: strategy.fields ?? null,
+        headers: { "Content-Type": mimeType },
+      }, 201);
+    }
+  }
+
+  // -- POST /tickets/:id/attachments/:attachmentId/complete -------------------
+  {
+    const m = path.match(/^\/tickets\/([^/]+)\/attachments\/([^/]+)\/complete$/);
+    if (req.method === "POST" && m) {
+      const t = await ticketById(decodeURIComponent(m[1]));
+      if (!t || (t.requester_id !== p.id && !isDesk)) {
+        return err(req, 404, "NOT_FOUND", "Ticket not found.");
+      }
+      const attachmentId = decodeURIComponent(m[2]);
+      const { data } = await db
+        .from("attachments")
+        .select("id, status, storage_key, confirm_url")
+        .eq("id", attachmentId)
+        .eq("ticket_id", t.id)
+        .maybeSingle();
+      const row = data as
+        | { id: string; status: string; storage_key: string; confirm_url: string | null }
+        | null;
+      if (!row) return err(req, 404, "NOT_FOUND", "Attachment not found.");
+      if (row.status === "available") return json(req, { ok: true });
+      // Confirm with storage when the upload strategy required it. A failed
+      // confirm stays retryable: the row keeps `scanning` and the client
+      // retries complete (or re-uploads) without losing the ticket.
+      if (row.confirm_url) {
+        try {
+          const res = await fetch(row.confirm_url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${API_KEY}`,
+            },
+            body: JSON.stringify({ size: 0, contentType: "application/octet-stream" }),
+          });
+          if (!res.ok) throw new Error(`confirm ${res.status}`);
+        } catch {
+          return err(
+            req,
+            502,
+            "UPLOAD_UNAVAILABLE",
+            "Couldn't confirm the upload. Retry the file in a moment.",
+          );
+        }
+      }
+      await db.from("attachments").update({ status: "available", confirm_url: null }).eq("id", row.id);
+      return json(req, { ok: true });
+    }
+  }
+
+  // -- GET /attachments/:id/url (short-lived download, never a stored URL) ----
+  {
+    const m = path.match(/^\/attachments\/([^/]+)\/url$/);
+    if (req.method === "GET" && m) {
+      const attachmentId = decodeURIComponent(m[1]);
+      const { data } = await db
+        .from("attachments")
+        .select("id, ticket_id, storage_key, status")
+        .eq("id", attachmentId)
+        .maybeSingle();
+      const row = data as
+        | { id: string; ticket_id: string; storage_key: string; status: string }
+        | null;
+      if (!row) return err(req, 404, "NOT_FOUND", "Attachment not found.");
+      const t = await ticketById(row.ticket_id);
+      if (!t || (t.requester_id !== p.id && !isDesk)) {
+        return err(req, 404, "NOT_FOUND", "Attachment not found.");
+      }
+      if (row.status !== "available") {
+        return err(req, 422, "ATTACHMENT_NOT_READY", "Still processing — try again in a moment.");
+      }
+      const { data: signed, error: signError } = await admin.storage
+        .from(ATTACH_BUCKET)
+        .createSignedUrl(row.storage_key, 3600);
+      if (signError || !signed) {
+        return err(req, 502, "UPLOAD_UNAVAILABLE", "Couldn't open the file. Try again in a moment.");
+      }
+      return json(req, {
+        url: (signed as { signedUrl: string }).signedUrl,
+        expiresAt: (signed as { expiresAt: string | null }).expiresAt,
       });
     }
   }
@@ -808,7 +1030,7 @@ export default async function (req: Request): Promise<Response> {
         await Promise.all([
           db.from("ticket_events").select("id, ticket_id, type, message, actor, created_at").eq("ticket_id", t.id).order("created_at", { ascending: true }).limit(100),
           db.from("messages").select("id, ticket_id, author_role, text, created_at").eq("ticket_id", t.id).order("created_at", { ascending: true }).limit(100),
-          db.from("attachments").select("id, ticket_id, file_name, mime_type, size_bytes, created_at").eq("ticket_id", t.id).limit(20),
+          db.from("attachments").select("id, ticket_id, file_name, mime_type, size_bytes, status, created_at").eq("ticket_id", t.id).limit(20),
         ]);
       return json(req, {
         ticket: await toDeskTicket(t),
@@ -819,7 +1041,7 @@ export default async function (req: Request): Promise<Response> {
           id: msg["id"], ticketId: msg["ticket_id"], authorRole: msg["author_role"], text: msg["text"], createdAt: msg["created_at"],
         })),
         attachments: ((attachments ?? []) as Record<string, unknown>[]).map((a) => ({
-          id: a["id"], ticketId: a["ticket_id"], fileName: a["file_name"], mimeType: a["mime_type"], sizeBytes: a["size_bytes"], createdAt: a["created_at"],
+          id: a["id"], ticketId: a["ticket_id"], fileName: a["file_name"], mimeType: a["mime_type"], sizeBytes: a["size_bytes"], status: a["status"], createdAt: a["created_at"],
         })),
         justOpened: false,
       });

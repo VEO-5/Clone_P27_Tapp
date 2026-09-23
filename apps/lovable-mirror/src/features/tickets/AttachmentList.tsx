@@ -3,6 +3,7 @@
 import type { Attachment } from "@pearl27/contracts";
 import { FileText, ImageIcon, Loader2, Paperclip } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 
 import { apiFetch } from "@/lib/api";
 import { formatBytes } from "@/lib/utils";
@@ -20,6 +21,8 @@ export function AttachmentList({ attachments }: { attachments?: Attachment[] | n
         `/attachments/${attachment.id}/url`,
       );
       window.open(url, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Couldn't open the file.");
     } finally {
       setOpening(null);
     }

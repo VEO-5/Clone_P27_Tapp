@@ -6,6 +6,8 @@ import { z } from "zod";
 
 import { useSession } from "@/features/auth/useSession";
 import { apiFetch } from "@/lib/api";
+import { maybeCompressImage } from "@/lib/image-compress";
+import { validateFile } from "@/lib/validation";
 
 import { useCategories } from "./categories";
 
@@ -101,13 +103,23 @@ export function useTicketSubmit() {
   async function uploadOne(ticketId: string, file: File, onProgress: (p: number) => void): Promise<UploadState> {
     const base: UploadState = { fileName: file.name, status: "uploading", progress: 0 };
     try {
+      // Large photos are downscaled to a triage-friendly JPEG first, so an
+      // oversize phone screenshot uploads instead of failing the 5 MB cap.
+      const { file: effective, compressed } = await maybeCompressImage(file);
+      const validationError = validateFile(effective);
+      if (validationError) {
+        return { ...base, fileName: effective.name, status: "error", progress: 0, message: validationError };
+      }
       const presigned = await apiFetch<PresignedUpload>(`/tickets/${ticketId}/attachments/presign`, {
         method: "POST",
-        body: JSON.stringify({ fileName: file.name, mimeType: file.type, sizeBytes: file.size }),
+        body: JSON.stringify({ fileName: effective.name, mimeType: effective.type, sizeBytes: effective.size }),
       });
-      await uploadFileWithProgress(presigned.uploadUrl, file, onProgress, presigned.headers ?? {});
+      await uploadFileWithProgress(presigned.uploadUrl, effective, onProgress, presigned.headers ?? {}, {
+        method: presigned.method,
+        fields: presigned.fields,
+      });
       await apiFetch(`/tickets/${ticketId}/attachments/${presigned.attachmentId}/complete`, { method: "POST" });
-      return { ...base, status: "done", progress: 100 };
+      return { ...base, fileName: effective.name, status: "done", progress: 100, compressed };
     } catch (error) {
       return {
         ...base,

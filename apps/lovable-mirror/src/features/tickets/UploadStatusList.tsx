@@ -9,6 +9,8 @@ export interface UploadState {
   status: "uploading" | "done" | "error";
   progress: number;
   message?: string;
+  /** True when a large photo was downscaled before upload. */
+  compressed?: boolean;
 }
 
 /**
@@ -60,6 +62,9 @@ export function UploadStatusList({
                 <span className="mt-0.5 block text-[12.5px] text-rose-400">
                   {upload.message ?? "Upload failed — your ticket is saved."}
                 </span>
+              )}
+              {upload.status === "done" && upload.compressed && (
+                <span className="mt-0.5 block text-[12px] text-fog">Compressed for upload</span>
               )}
             </span>
             {upload.status === "done" && <CheckCircle2 className="size-4 shrink-0 text-jade-400" aria-label="Uploaded" />}
