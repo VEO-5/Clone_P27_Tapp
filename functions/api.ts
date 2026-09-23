@@ -246,6 +246,33 @@ export default async function (req: Request): Promise<Response> {
     return null;
   }
 
+  /**
+   * Google name/photo InsForge stores in auth.user_providers (keys: name,
+   * avatar). Read through the locked-down public.google_identity() reader —
+   * the auth schema itself is never exposed. Null when the user never linked
+   * Google (OTP-only). Best-effort — never throws.
+   */
+  async function googleIdentity(): Promise<{ name: string | null; avatar: string | null }> {
+    const empty = { name: null as string | null, avatar: null as string | null };
+    try {
+      // deno-lint-ignore no-explicit-any
+      const db = admin.database as any;
+      const { data } = await db.rpc("google_identity", { p_user_id: user!.id });
+      const row = (Array.isArray(data) ? data[0] : null) as
+        | { name?: unknown; avatar?: unknown }
+        | null;
+      if (!row) return empty;
+      const name = String(row.name ?? "").trim();
+      const avatar = String(row.avatar ?? "").trim();
+      return {
+        name: name || null,
+        avatar: avatar && /^https:\/\//.test(avatar) ? avatar : null,
+      };
+    } catch {
+      return empty;
+    }
+  }
+
   async function profile(): Promise<DbProfile | null> {
     // deno-lint-ignore no-explicit-any
     const db = admin.database as any;
@@ -261,9 +288,12 @@ export default async function (req: Request): Promise<Response> {
       // better values. Best-effort — never block sign-in.
       try {
         const prefix = row.email.split("@")[0].toLowerCase();
+        // Google's stored identity wins over the JWT profile stub (which for
+        // OTP users is just the email prefix). Best-effort — never block sign-in.
+        const google = await googleIdentity();
         // deno-lint-ignore no-explicit-any
         const patch: Record<string, any> = {};
-        const betterName = authDisplayName();
+        const betterName = google.name ?? authDisplayName();
         if (
           betterName &&
           row.name.trim().toLowerCase() === prefix &&
@@ -271,7 +301,7 @@ export default async function (req: Request): Promise<Response> {
         ) {
           patch.name = betterName;
         }
-        const betterAvatar = authAvatarUrl();
+        const betterAvatar = google.avatar ?? authAvatarUrl();
         if (betterAvatar && !row.avatar_url) {
           patch.avatar_url = betterAvatar;
         }
@@ -294,7 +324,10 @@ export default async function (req: Request): Promise<Response> {
     if (!email.endsWith("@pearl27.com")) {
       return null;
     }
-    const name = authDisplayName() ?? email.split("@")[0];
+    // Prefer Google's stored identity (covers first-time Google sign-ins,
+    // whose provider row already exists by the time /auth/me is called).
+    const google = await googleIdentity();
+    const name = google.name ?? authDisplayName() ?? email.split("@")[0];
     // Straight-to-Desk: an admin invite stored in role_invites claims the
     // invited role on first login (single-use). No invite -> employee.
     // Invite lookup failure must never block sign-in -> fall back to employee.
@@ -318,7 +351,7 @@ export default async function (req: Request): Promise<Response> {
         id: user!.id,
         email,
         name,
-        avatar_url: authAvatarUrl(),
+        avatar_url: google.avatar ?? authAvatarUrl(),
         role: firstRole,
       }])
       .select("id, email, name, avatar_url, role, team_id")
