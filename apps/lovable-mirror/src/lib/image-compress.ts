@@ -10,6 +10,18 @@ export const COMPRESS_QUALITY = 0.82;
 /** Refuse before decoding so a giant file can't hang the tab. */
 export const MAX_PROCESS_BYTES = 30 * 1024 * 1024;
 
+/** Files this session downscaled — lets the confirmation screen credit them. */
+const compressedFiles = new WeakSet<File>();
+
+export function wasCompressed(file: File): boolean {
+  return compressedFiles.has(file);
+}
+
+/** Test hook + explicit opt-in marker (maybeCompressImage marks automatically). */
+export function markCompressed(file: File): void {
+  compressedFiles.add(file);
+}
+
 export function isCompressibleImage(file: { type: string }): boolean {
   return (COMPRESSIBLE_MIME_TYPES as readonly string[]).includes(file.type);
 }
@@ -99,8 +111,7 @@ export async function maybeCompressImage(file: File): Promise<{ file: File; comp
     throw new Error(`${file.name} is too large even compressed — the limit is ${formatBytes(MAX_FILE_BYTES)}`);
   }
   const name = file.name.replace(/\.[a-z0-9]+$/i, "") || "photo";
-  return {
-    file: new File([blob], `${name}.jpg`, { type: "image/jpeg", lastModified: Date.now() }),
-    compressed: true,
-  };
+  const compressed = new File([blob], `${name}.jpg`, { type: "image/jpeg", lastModified: Date.now() });
+  compressedFiles.add(compressed);
+  return { file: compressed, compressed: true };
 }

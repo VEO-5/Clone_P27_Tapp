@@ -6,8 +6,10 @@ import { z } from "zod";
 
 import { useSession } from "@/features/auth/useSession";
 import { apiFetch } from "@/lib/api";
-import { maybeCompressImage } from "@/lib/image-compress";
+import { wasCompressed } from "@/lib/image-compress";
 import { validateFile } from "@/lib/validation";
+
+import { usePreparedFiles } from "./usePreparedFiles";
 
 import { useCategories } from "./categories";
 
@@ -44,7 +46,10 @@ function flattenZod(error: z.ZodError): Record<string, string> {
 export function useTicketSubmit() {
   const session = useSession();
   const [values, setValues] = useState<TicketFormValues>(EMPTY_FORM);
-  const [files, setFiles] = useState<File[]>([]);
+  // Files arrive fully processed (see usePreparedFiles): what you preview
+  // is byte-for-byte what uploads — submit never re-processes.
+  const pipeline = usePreparedFiles();
+  const files = pipeline.files;
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -78,19 +83,9 @@ export function useTicketSubmit() {
     formRef.current?.querySelector<HTMLElement>(`[name="${first}"]`)?.focus();
   };
 
-  const handleFilesChange = (next: File[]) => {
-    setFiles(next);
-    setErrors((current) => {
-      if (!current.files) return current;
-      const nextErrors = { ...current };
-      delete nextErrors.files;
-      return nextErrors;
-    });
-  };
-
   const reset = () => {
     setValues(EMPTY_FORM);
-    setFiles([]);
+    pipeline.reset();
     setErrors({});
     setFormError(null);
     setResult(null);
@@ -103,23 +98,22 @@ export function useTicketSubmit() {
   async function uploadOne(ticketId: string, file: File, onProgress: (p: number) => void): Promise<UploadState> {
     const base: UploadState = { fileName: file.name, status: "uploading", progress: 0 };
     try {
-      // Large photos are downscaled to a triage-friendly JPEG first, so an
-      // oversize phone screenshot uploads instead of failing the 5 MB cap.
-      const { file: effective, compressed } = await maybeCompressImage(file);
-      const validationError = validateFile(effective);
+      // Already final bytes from the select-time pipeline — only a cheap
+      // last guard here, never a second compression pass.
+      const validationError = validateFile(file);
       if (validationError) {
-        return { ...base, fileName: effective.name, status: "error", progress: 0, message: validationError };
+        return { ...base, status: "error", progress: 0, message: validationError };
       }
       const presigned = await apiFetch<PresignedUpload>(`/tickets/${ticketId}/attachments/presign`, {
         method: "POST",
-        body: JSON.stringify({ fileName: effective.name, mimeType: effective.type, sizeBytes: effective.size }),
+        body: JSON.stringify({ fileName: file.name, mimeType: file.type, sizeBytes: file.size }),
       });
-      await uploadFileWithProgress(presigned.uploadUrl, effective, onProgress, presigned.headers ?? {}, {
+      await uploadFileWithProgress(presigned.uploadUrl, file, onProgress, presigned.headers ?? {}, {
         method: presigned.method,
         fields: presigned.fields,
       });
       await apiFetch(`/tickets/${ticketId}/attachments/${presigned.attachmentId}/complete`, { method: "POST" });
-      return { ...base, fileName: effective.name, status: "done", progress: 100, compressed };
+      return { ...base, status: "done", progress: 100, compressed: wasCompressed(file) || undefined };
     } catch (error) {
       return {
         ...base,
@@ -142,6 +136,8 @@ export function useTicketSubmit() {
     // after the text fields so focus still lands on the title first.
     if (files.length === 0) {
       fieldErrors.files ??= "Attach at least one screenshot or file so support can see the issue.";
+    } else if (pipeline.hasProcessing) {
+      fieldErrors.files ??= "Still processing your photos — wait a moment and try again.";
     }
     if (Object.keys(fieldErrors).length > 0) {
       setErrors(fieldErrors);
@@ -237,7 +233,10 @@ export function useTicketSubmit() {
     values,
     set,
     files,
-    handleFilesChange,
+    fileItems: pipeline.items,
+    rejectedFiles: pipeline.rejected,
+    addFiles: pipeline.addFiles,
+    removeFile: pipeline.removeFile,
     errors,
     formError,
     submitting,

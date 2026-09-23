@@ -701,9 +701,10 @@ export default async function (req: Request): Promise<Response> {
 
   // -- attachments (presigned upload + short-lived download) -------------------
   // The browser never holds storage credentials: presign mints a
-  // credential-free upload target via the storage upload-strategy, the
-  // browser PUTs/POSTs bytes straight to storage, then complete flips the
-  // row to available (confirming with storage when the strategy requires).
+  // credential-free upload target via the storage upload-strategy (S3
+  // POST-form: absolute uploadUrl + policy fields + backend-relative
+  // confirmUrl), the browser POSTs bytes straight to storage, then complete
+  // confirms with storage and flips the row to available.
   const ATTACH_BUCKET = "ticket-attachments";
   const ATTACH_MAX_BYTES = 5 * 1024 * 1024;
   const ATTACH_MAX_FILES = 5;
@@ -850,36 +851,52 @@ export default async function (req: Request): Promise<Response> {
       const attachmentId = decodeURIComponent(m[2]);
       const { data } = await db
         .from("attachments")
-        .select("id, status, storage_key, confirm_url")
+        .select("id, status, storage_key, mime_type, size_bytes, confirm_url")
         .eq("id", attachmentId)
         .eq("ticket_id", t.id)
         .maybeSingle();
       const row = data as
-        | { id: string; status: string; storage_key: string; confirm_url: string | null }
+        | { id: string; status: string; storage_key: string; mime_type: string; size_bytes: number; confirm_url: string | null }
         | null;
       if (!row) return err(req, 404, "NOT_FOUND", "Attachment not found.");
       if (row.status === "available") return json(req, { ok: true });
-      // Confirm with storage when the upload strategy required it. A failed
-      // confirm stays retryable: the row keeps `scanning` and the client
-      // retries complete (or re-uploads) without losing the ticket.
+      // Confirm with storage when the upload strategy required it. The
+      // strategy hands back a backend-relative confirm path, so resolve it
+      // against the backend origin (a bare fetch of a relative URL throws).
+      // Report the row's real size/mime — a zero-size claim is rejected.
+      // If confirm errors, fall back to an existence check: when the object
+      // is provably there, the confirm was unnecessary — go available.
+      // Only a genuinely missing object stays retryable in `scanning`.
       if (row.confirm_url) {
+        const confirmTarget = /^https?:\/\//i.test(row.confirm_url)
+          ? row.confirm_url
+          : `${BASE_URL}${row.confirm_url.startsWith("/") ? row.confirm_url : `/${row.confirm_url}`}`;
+        let confirmed = false;
         try {
-          const res = await fetch(row.confirm_url, {
+          const res = await fetch(confirmTarget, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
               "Authorization": `Bearer ${API_KEY}`,
             },
-            body: JSON.stringify({ size: 0, contentType: "application/octet-stream" }),
+            body: JSON.stringify({ size: row.size_bytes, contentType: row.mime_type }),
           });
-          if (!res.ok) throw new Error(`confirm ${res.status}`);
+          confirmed = res.ok;
         } catch {
-          return err(
-            req,
-            502,
-            "UPLOAD_UNAVAILABLE",
-            "Couldn't confirm the upload. Retry the file in a moment.",
-          );
+          confirmed = false;
+        }
+        if (!confirmed) {
+          const { data: signed, error: signError } = await admin.storage
+            .from(ATTACH_BUCKET)
+            .createSignedUrl(row.storage_key, 60);
+          if (signError || !signed) {
+            return err(
+              req,
+              502,
+              "UPLOAD_UNAVAILABLE",
+              "Couldn't confirm the upload. Retry the file in a moment.",
+            );
+          }
         }
       }
       await db.from("attachments").update({ status: "available", confirm_url: null }).eq("id", row.id);

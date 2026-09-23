@@ -4,6 +4,8 @@ import {
   COMPRESS_LONG_EDGE,
   compressTarget,
   isCompressibleImage,
+  markCompressed,
+  wasCompressed,
 } from "./image-compress";
 
 describe("isCompressibleImage", () => {
@@ -21,6 +23,16 @@ describe("isCompressibleImage", () => {
   });
 });
 
+describe("compressed tracking", () => {
+  it("starts unmarked and marks without leaking across files", () => {
+    const a = new File(["x"], "a.jpg", { type: "image/jpeg" });
+    const b = new File(["x"], "b.jpg", { type: "image/jpeg" });
+    expect(wasCompressed(a)).toBe(false);
+    markCompressed(a);
+    expect(wasCompressed(a)).toBe(true);
+    expect(wasCompressed(b)).toBe(false);
+  });
+});
 describe("compressTarget", () => {
   it("leaves small images untouched", () => {
     expect(compressTarget(800, 600)).toEqual({ width: 800, height: 600 });

@@ -1,107 +1,37 @@
 "use client";
 
-import { FileText, ImageIcon, Paperclip, UploadCloud, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FileText, ImageIcon, Loader2, Paperclip, UploadCloud, X } from "lucide-react";
+import { useRef, useState } from "react";
 
+import type { PreparedItem } from "@/features/tickets/usePreparedFiles";
 import {
   ACCEPT_ATTRIBUTE,
-  ALLOWED_MIME_TYPES,
   MAX_FILES,
   MAX_FILE_BYTES,
   formatBytes,
-  validateFile,
 } from "@/lib/validation";
-import { MAX_PROCESS_BYTES, isCompressibleImage } from "@/lib/image-compress";
 import { cn } from "@/lib/utils";
 
 export interface UploadZoneProps {
-  files: File[];
-  onChange: (files: File[]) => void;
+  items: PreparedItem[];
+  rejected: string[];
+  onAdd: (files: File[]) => void;
+  onRemove: (key: string) => void;
   disabled?: boolean;
 }
 
 /**
- * Screenshot/file picker with drag-and-drop, image previews, and per-file
- * validation. Rejected files are reported inline and the accepted ones are
- * kept, so one bad drop doesn't clear the employee's work.
+ * Screenshot/file picker with drag-and-drop. Processing happens the moment
+ * files are picked (see usePreparedFiles): rows show the FINAL bytes being
+ * previewed and uploaded — "Processing…", then the compressed preview.
+ * Rejected files are reported inline without clearing accepted work.
  */
-export function UploadZone({ files, onChange, disabled }: UploadZoneProps) {
+export function UploadZone({ items, rejected, onAdd, onRemove, disabled }: UploadZoneProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
-  const [rejected, setRejected] = useState<string[]>([]);
-  const [notices, setNotices] = useState<string[]>([]);
 
-  // Object URLs must be revoked or the page leaks memory as files are swapped.
-  const previews = useMemo(
-    () =>
-      files.map((file) => ({
-        key: `${file.name}-${file.size}-${file.lastModified}`,
-        file,
-        url: file.type.startsWith("image/") ? URL.createObjectURL(file) : null,
-      })),
-    [files],
-  );
-
-  useEffect(() => {
-    return () => {
-      previews.forEach((preview) => preview.url && URL.revokeObjectURL(preview.url));
-    };
-  }, [previews]);
-
-  const addFiles = useCallback(
-    (incoming: FileList | null) => {
-      if (!incoming || incoming.length === 0) return;
-
-      const errors: string[] = [];
-      const infos: string[] = [];
-      const accepted: File[] = [];
-
-      for (const file of Array.from(incoming)) {
-        const duplicate = files.some(
-          (existing) => existing.name === file.name && existing.size === file.size,
-        );
-        if (duplicate) continue;
-
-        const error = validateFile(file);
-        if (error) {
-          // Oversize still photo: accept it — it is downscaled to a
-          // triage-friendly JPEG at submit time instead of failing the cap.
-          if (
-            (ALLOWED_MIME_TYPES as readonly string[]).includes(file.type) &&
-            isCompressibleImage(file) &&
-            file.size > MAX_FILE_BYTES &&
-            file.size <= MAX_PROCESS_BYTES
-          ) {
-            infos.push(`${file.name} is large and will be compressed on submit`);
-          } else {
-            errors.push(error);
-            continue;
-          }
-        }
-
-        if (files.length + accepted.length >= MAX_FILES) {
-          errors.push(`You can attach up to ${MAX_FILES} files`);
-          break;
-        }
-        accepted.push(file);
-      }
-
-      setRejected(errors);
-      setNotices(infos);
-      if (accepted.length > 0) onChange([...files, ...accepted]);
-    },
-    [files, onChange],
-  );
-
-  const remove = (key: string) => {
-    setRejected([]);
-    setNotices([]);
-    onChange(
-      files.filter((file) => `${file.name}-${file.size}-${file.lastModified}` !== key),
-    );
-  };
-
-  const full = files.length >= MAX_FILES;
+  const liveCount = items.filter((item) => item.status !== "error").length;
+  const full = liveCount >= MAX_FILES;
 
   const openPicker = (event: React.SyntheticEvent) => {
     // Clicks that land directly on the native input already open the dialog —
@@ -133,7 +63,7 @@ export function UploadZone({ files, onChange, disabled }: UploadZoneProps) {
         onDrop={(event) => {
           event.preventDefault();
           setDragging(false);
-          if (!disabled && !full) addFiles(event.dataTransfer.files);
+          if (!disabled && !full) onAdd(Array.from(event.dataTransfer.files));
         }}
         className={cn(
           "group relative flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed px-6 py-8 text-center transition-all duration-200",
@@ -165,7 +95,7 @@ export function UploadZone({ files, onChange, disabled }: UploadZoneProps) {
         </p>
         <p className="text-[11.5px] text-fog">
           PNG, JPEG, WebP, GIF, PDF or TXT · up to {formatBytes(MAX_FILE_BYTES)} each · larger
-          photos are compressed automatically
+          photos are processed on the spot
         </p>
 
         <input
@@ -178,22 +108,12 @@ export function UploadZone({ files, onChange, disabled }: UploadZoneProps) {
           className="sr-only"
           disabled={disabled || full}
           onChange={(event) => {
-            addFiles(event.target.files);
+            onAdd(Array.from(event.target.files ?? []));
             // Reset so re-picking the same file still fires a change event.
             event.target.value = "";
           }}
         />
       </div>
-
-      {notices.length > 0 && (
-        <ul aria-live="polite" className="flex flex-col gap-1">
-          {notices.map((message) => (
-            <li key={message} className="text-[12.5px] text-fog">
-              {message}
-            </li>
-          ))}
-        </ul>
-      )}
 
       {rejected.length > 0 && (
         <ul aria-live="polite" className="flex flex-col gap-1">
@@ -205,18 +125,20 @@ export function UploadZone({ files, onChange, disabled }: UploadZoneProps) {
         </ul>
       )}
 
-      {previews.length > 0 && (
+      {items.length > 0 && (
         <ul className="flex flex-col gap-2">
-          {previews.map(({ key, file, url }) => (
+          {items.map((item) => (
             <li
-              key={key}
+              key={item.key}
               className="animate-rise flex items-center gap-3 rounded-xl border border-ink-700 bg-ink-800/60 p-2.5"
             >
               <span className="grid size-11 shrink-0 place-items-center overflow-hidden rounded-lg border border-ink-600 bg-ink-900">
-                {url ? (
-                  // eslint-disable-next-line @next/next/no-img-element -- local blob preview, not a remote asset
-                  <img src={url} alt="" className="size-full object-cover" />
-                ) : file.type === "application/pdf" ? (
+                {item.status === "processing" ? (
+                  <Loader2 className="size-4 animate-spin text-mist" aria-hidden />
+                ) : item.previewUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- local blob preview of the final upload bytes
+                  <img src={item.previewUrl} alt="" className="size-full object-cover" />
+                ) : item.name.toLowerCase().endsWith(".pdf") ? (
                   <FileText className="size-4 text-mist" aria-hidden />
                 ) : (
                   <ImageIcon className="size-4 text-mist" aria-hidden />
@@ -225,16 +147,29 @@ export function UploadZone({ files, onChange, disabled }: UploadZoneProps) {
 
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[13px] font-medium text-pearl-dim">
-                  {file.name}
+                  {item.name}
                 </span>
-                <span className="mono-ref text-[11px] text-fog">{formatBytes(file.size)}</span>
+                {item.status === "processing" ? (
+                  <span className="mono-ref text-[11px] text-fog" aria-live="polite">
+                    Processing…
+                  </span>
+                ) : item.status === "error" ? (
+                  <span className="mt-0.5 block text-[12px] text-rose-400" role="alert">
+                    {item.error ?? "Couldn't process this file."}
+                  </span>
+                ) : (
+                  <span className="mono-ref text-[11px] text-fog">
+                    {formatBytes(item.size)}
+                    {item.note ? ` · ${item.note}` : ""}
+                  </span>
+                )}
               </span>
 
               <button
                 type="button"
-                onClick={() => remove(key)}
+                onClick={() => onRemove(item.key)}
                 disabled={disabled}
-                aria-label={`Remove ${file.name}`}
+                aria-label={`Remove ${item.name}`}
                 className="grid size-8 shrink-0 place-items-center rounded-lg text-fog transition-colors hover:bg-ink-700 hover:text-rose-400"
               >
                 <X className="size-4" aria-hidden />
@@ -244,10 +179,10 @@ export function UploadZone({ files, onChange, disabled }: UploadZoneProps) {
         </ul>
       )}
 
-      {files.length > 0 && (
+      {liveCount > 0 && (
         <p className="flex items-center gap-1.5 text-[11.5px] text-fog">
           <Paperclip className="size-3" aria-hidden />
-          {files.length} of {MAX_FILES} files attached
+          {liveCount} of {MAX_FILES} files attached
         </p>
       )}
     </div>
