@@ -15,6 +15,11 @@ export function SessionHeader() {
   if (pathname === "/sign-in" || pathname.startsWith("/auth/")) {
     return <SiteHeader role="signedOut" hideNav />;
   }
+  // Session still resolving (cold refresh): neutral skeleton bar, never the
+  // signed-out look — the wrong chrome flashing first is the refresh glitch.
+  if (session.isPending) {
+    return <SiteHeader role="signedOut" hideNav pending />;
+  }
   return (
     <SiteHeader
       role={role === "employee" || role === "agent" || role === "admin" ? role : "signedOut"}

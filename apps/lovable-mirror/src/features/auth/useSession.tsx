@@ -5,6 +5,7 @@ import type { Profile } from "@/lib/contracts.vendored";
 
 import { ApiError, apiFetch } from "@/lib/api";
 import { config } from "@/lib/config";
+import { insforge } from "@/lib/insforge";
 import { queryKeys } from "@/lib/query";
 import { waitForAuthHydration } from "@/lib/session-persist";
 
@@ -25,7 +26,32 @@ export interface SessionProfile extends Profile {
  * before that settles produces a false 401 and RoleGate bounces to
  * /sign-in — the reload-signout bug. While hydrating, the query stays
  * pending (RoleGate renders its skeleton, never a redirect).
+ *
+ * A single 401 still doesn't mean signed out: the persisted token may have
+ * expired while a silent refresh was in flight (the refresh-race bounce —
+ * sign-in flashing on reload). So on a first-attempt 401 in live mode, the
+ * query forces one silent-refresh attempt and retries /auth/me exactly
+ * once. Only a second 401 (or a non-401 error) settles as an error and
+ * lets RoleGate redirect. Genuine sign-outs bounce one beat later;
+ * refresh races heal with no page flash.
  */
+async function fetchSessionProfile(): Promise<Profile> {
+  try {
+    return await apiFetch<Profile>("/auth/me");
+  } catch (error) {
+    if (!config.insforgeLive || !(error instanceof ApiError) || error.status !== 401) {
+      throw error;
+    }
+    // One silent-refresh attempt: resolves a fresh token when the refresh
+    // completed just after the first call went out.
+    try {
+      await insforge.getHttpClient().getValidAccessToken();
+    } catch {
+      throw error;
+    }
+    return apiFetch<Profile>("/auth/me");
+  }
+}
 export function useSession() {
   const [hydrated, setHydrated] = useState(!config.insforgeLive);
   useEffect(() => {
@@ -40,7 +66,7 @@ export function useSession() {
   }, []);
   return useQuery<SessionProfile, ApiError>({
     queryKey: queryKeys.me,
-    queryFn: () => apiFetch<Profile>("/auth/me"),
+    queryFn: fetchSessionProfile,
     enabled: hydrated,
     staleTime: Infinity,
     gcTime: Infinity,
