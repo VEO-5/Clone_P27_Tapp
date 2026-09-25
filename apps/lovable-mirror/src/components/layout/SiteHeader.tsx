@@ -1,8 +1,21 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import { useState } from "react";
+import { LogOut, Pencil } from "lucide-react";
 
 import { UserAvatar } from "@/components/UserAvatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/shadcn/dropdown-menu";
+import { EditProfileDialog } from "@/features/auth/EditProfileDialog";
+import { useSignOut } from "@/features/auth/useSession";
 import { ReportIssueSheet } from "@/features/tickets/ReportIssueSheet";
+import { config } from "@/lib/config";
+import type { Profile } from "@/lib/contracts.vendored";
 import { cn } from "@/lib/utils";
 
 const NAV_BY_ROLE = {
@@ -27,28 +40,25 @@ const NAV_BY_ROLE = {
 } as const;
 
 /**
- * Employee identity in the header — the shared UserAvatar chain
- * (upload / Google photo → Gravatar for the email → generated fallback),
- * kept at the same size-7 footprint as the old initials circle.
+ * Employee identity in the header — avatar-only trigger opening the account
+ * menu (name + email, edit profile, sign out). Mirrors the desk sidebar
+ * account menu so both shells behave the same.
  */
 export function SiteHeader({
-  employeeEmail,
-  employeeName,
-  employeeAvatarUrl,
+  employeeProfile,
   role = "signedOut",
-  action,
   hideNav = false,
 }: {
-  employeeEmail?: string | null;
-  employeeName?: string | null;
-  employeeAvatarUrl?: string | null;
+  employeeProfile?: Profile | null;
   role?: keyof typeof NAV_BY_ROLE;
-  action?: React.ReactNode;
   hideNav?: boolean;
 }) {
   const pathname = useLocation().pathname;
   const NAV = NAV_BY_ROLE[role];
   const [reportOpen, setReportOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const signOut = useSignOut();
+  const email = employeeProfile?.email ?? null;
 
   // The desk is a full app shell — sidebar owns the logo, topbar owns utilities.
   // (Admin lives inside the desk shell, so /desk covers it too.)
@@ -112,25 +122,61 @@ export function SiteHeader({
           )}
           <ReportIssueSheet open={reportOpen} onOpenChange={setReportOpen} />
 
-          {employeeEmail && (
-            <span className="hidden items-center gap-2 lg:flex">
-              <UserAvatar
-                email={employeeEmail}
-                name={employeeName ?? employeeEmail}
-                avatarUrl={employeeAvatarUrl ?? null}
-                className="size-7 border border-ink-700"
-                fallbackClassName="bg-pearl text-[10px] font-semibold text-cream"
-              />
-              <p
-                className="max-w-[10rem] truncate font-mono text-[10px] text-fog"
-                title={employeeEmail}
-              >
-                {employeeEmail}
-              </p>
-              {action}
-            </span>
+          {email && employeeProfile && (
+            <>
+              <DropdownMenu modal={false}>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label={`Account: ${employeeProfile.name}`}
+                    title={email}
+                    className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iris-500/40"
+                  >
+                    <UserAvatar
+                      email={email}
+                      name={employeeProfile.name}
+                      avatarUrl={employeeProfile.avatarUrl ?? null}
+                      className="size-7 border border-ink-700"
+                      fallbackClassName="bg-pearl text-[10px] font-semibold text-cream"
+                    />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="end"
+                  sideOffset={8}
+                  avoidCollisions
+                  className="w-56"
+                  onCloseAutoFocus={(e) => e.preventDefault()}
+                >
+                  <DropdownMenuLabel className="font-normal">
+                    <span className="block truncate font-sans text-[13px] font-semibold text-pearl">
+                      {employeeProfile.name}
+                    </span>
+                    <span className="block truncate font-mono text-[11px] text-fog" title={email}>
+                      {email}
+                    </span>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {!config.apiMock && (
+                    <DropdownMenuItem onSelect={() => setProfileOpen(true)}>
+                      <Pencil aria-hidden /> Edit profile
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => void signOut()}>
+                    <LogOut aria-hidden /> Sign out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              {!config.apiMock && (
+                <EditProfileDialog
+                  open={profileOpen}
+                  onOpenChange={setProfileOpen}
+                  profile={employeeProfile}
+                />
+              )}
+            </>
           )}
-          {employeeEmail && <span className="lg:hidden">{action}</span>}
         </div>
       </div>
     </header>

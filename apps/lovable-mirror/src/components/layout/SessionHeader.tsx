@@ -1,7 +1,6 @@
 import { useLocation } from "@tanstack/react-router";
 
 import { SiteHeader } from "@/components/layout/SiteHeader";
-import { SignOutButton } from "@/features/auth/SignOutButton";
 import { useSession } from "@/features/auth/useSession";
 import type { RoleName } from "@/lib/auth";
 
@@ -19,10 +18,7 @@ export function SessionHeader() {
   return (
     <SiteHeader
       role={role === "employee" || role === "agent" || role === "admin" ? role : "signedOut"}
-      employeeEmail={session.data?.email ?? null}
-      employeeName={session.data?.name ?? null}
-      employeeAvatarUrl={session.data?.avatarUrl ?? null}
-      action={session.data ? <SignOutButton /> : undefined}
+      employeeProfile={session.data ?? null}
     />
   );
 }
