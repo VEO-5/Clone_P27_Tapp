@@ -605,8 +605,31 @@ export default async function (req: Request): Promise<Response> {
       .range(cursor, cursor + limit - 1);
     if (error) return err(req, 500, "DB_ERROR", "Couldn't load tickets.");
     const rows = (data as DbTicket[]) ?? [];
-    const counts: Record<string, number> = {};
-    for (const r of rows) counts[r.status] = (counts[r.status] ?? 0) + 1;
+    // Card counts span the user's FULL set — never the 5-row page — and use
+    // the camelCase contract keys the frontend and mock share ({pending,
+    // open, inProgress, resolved}), zero-filled so no card ever goes blank.
+    const counts = { pending: 0, open: 0, inProgress: 0, resolved: 0 };
+    try {
+      const { data: allStatuses } = await db
+        .from("tickets")
+        .select("status")
+        .eq("requester_id", p.id)
+        .limit(1000);
+      for (const r of ((allStatuses ?? []) as { status: string }[])) {
+        if (r.status === "pending") counts.pending += 1;
+        else if (r.status === "open") counts.open += 1;
+        else if (r.status === "in_progress") counts.inProgress += 1;
+        else if (r.status === "resolved") counts.resolved += 1;
+      }
+    } catch {
+      // Fall back to the page rows rather than failing the whole dashboard.
+      for (const r of rows) {
+        if (r.status === "pending") counts.pending += 1;
+        else if (r.status === "open") counts.open += 1;
+        else if (r.status === "in_progress") counts.inProgress += 1;
+        else if (r.status === "resolved") counts.resolved += 1;
+      }
+    }
     return json(req, {
       items: rows.map(toTicket),
       nextCursor: rows.length === limit ? String(cursor + limit) : null,

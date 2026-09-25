@@ -50,7 +50,15 @@ export default function TicketsDashboard() {
     retry: false,
   });
 
-  const counts = mine.data?.counts ?? { pending: 0, open: 0, inProgress: 0, resolved: 0 };
+  // A card can never go blank: any missing key renders 0. (Loading state is
+  // covered by the skeleton block below, so 0 always means "none".)
+  const rawCounts = mine.data?.counts;
+  const counts = {
+    pending: rawCounts?.pending ?? 0,
+    open: rawCounts?.open ?? 0,
+    inProgress: rawCounts?.inProgress ?? 0,
+    resolved: rawCounts?.resolved ?? 0,
+  };
   const items = pages.flat();
   const seen = new Set<string>();
   const deduped = items.filter((ticket) => (seen.has(ticket.id) ? false : (seen.add(ticket.id), true)));
