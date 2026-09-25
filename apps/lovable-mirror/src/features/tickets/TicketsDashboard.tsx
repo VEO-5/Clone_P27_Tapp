@@ -59,6 +59,11 @@ export default function TicketsDashboard() {
     inProgress: rawCounts?.inProgress ?? 0,
     resolved: rawCounts?.resolved ?? 0,
   };
+  // Employee-only declutter: the header nav already carries "Submit a ticket",
+  // so the hero button is hidden for employees. Other roles keep it — admins
+  // have no header entry point. Hidden while the session is pending so the
+  // button never flashes in and out on refresh.
+  const showHeroCta = !session.isPending && session.data?.role !== "employee";
   const items = pages.flat();
   const seen = new Set<string>();
   const deduped = items.filter((ticket) => (seen.has(ticket.id) ? false : (seen.add(ticket.id), true)));
@@ -73,12 +78,16 @@ export default function TicketsDashboard() {
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="eyebrow">Your inbox</p>
-          <h1 className="mt-3 font-display text-4xl tracking-tight text-pearl">My tickets</h1>
+          {/* Page title lives in the header bar now — kept screen-reader-only
+              so the page retains its single h1 without doubling the visual. */}
+          <h1 className="sr-only">My tickets</h1>
         </div>
-        <Button variant="outline" size="sm" onClick={() => setReportOpen(true)}>
-          Submit a ticket
-          <ArrowRight className="size-3.5" aria-hidden />
-        </Button>
+        {showHeroCta && (
+          <Button variant="outline" size="sm" onClick={() => setReportOpen(true)}>
+            Submit a ticket
+            <ArrowRight className="size-3.5" aria-hidden />
+          </Button>
+        )}
         <ReportIssueSheet open={reportOpen} onOpenChange={setReportOpen} />
       </div>
 
