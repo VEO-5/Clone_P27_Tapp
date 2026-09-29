@@ -4,7 +4,7 @@
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import type { Assignee, DeskTicket } from "@pearl27/contracts";
-import { Loader2 } from "lucide-react";
+import { CircleCheck, Coffee, Inbox, Loader2, SearchX, UserRound, Users } from "lucide-react";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/shadcn/button";
@@ -137,6 +137,88 @@ function QueueContent({ params, query }: { params: ReturnType<typeof readQueuePa
     ["escape", () => setFocusedIndex(-1)],
   ]);
 
+  // Empty-state model: distinguish true-empty / user-cleared (celebration)
+  // from no-results (filters/search matched nothing). Filtered empties get
+  // "Clear filters", cleared queues get a next action — never history.back().
+  const hasActiveFilters = Boolean(params.q || params.status || params.priority || params.categoryId);
+  const isEmpty = Boolean(queue.data && rows.length === 0 && !queue.isFetching);
+  const needsAgentPick = params.tab === "by-agent" && !params.assigneeId;
+
+  function clearFilters() {
+    navigate({
+      to: `/desk/queue${queueQueryString({ ...params, q: "", status: "", priority: "", categoryId: "" })}`,
+    });
+  }
+
+  function goTab(tab: typeof params.tab) {
+    navigate({
+      to: `/desk/queue${queueQueryString({ ...params, tab, assigneeId: "", q: "", status: "", priority: "", categoryId: "" })}`,
+    });
+  }
+
+  const emptyState = needsAgentPick
+    ? {
+        icon: <Users className="size-5" aria-hidden />,
+        title: "Pick an agent",
+        description: "Choose an agent above to inspect their queue.",
+        action: undefined as React.ReactNode,
+      }
+    : hasActiveFilters
+      ? {
+          icon: <SearchX className="size-5" aria-hidden />,
+          title: "No matches",
+          description:
+            params.tab === "unassigned"
+              ? "No unassigned tickets match these filters."
+              : params.tab === "mine"
+                ? "None of your tickets match these filters."
+                : "No requests match these filters — try widening them.",
+          action: (
+            <Button type="button" size="sm" onClick={clearFilters}>
+              Clear filters
+            </Button>
+          ),
+        }
+      : params.tab === "unassigned"
+        ? {
+            icon: <Coffee className="size-5" aria-hidden />,
+            title: "You're all caught up",
+            description: "No unassigned tickets. Nice — grab a coffee.",
+            action: (
+              <Button type="button" variant="outline" size="sm" onClick={() => goTab("all")}>
+                View all requests
+              </Button>
+            ),
+          }
+        : params.tab === "mine"
+          ? {
+              icon: <UserRound className="size-5" aria-hidden />,
+              title: "Your queue is clear",
+              description: "Claim your next ticket from Unassigned to get started.",
+              action: (
+                <Button type="button" variant="outline" size="sm" onClick={() => goTab("unassigned")}>
+                  Browse unassigned
+                </Button>
+              ),
+            }
+          : params.tab === "by-agent"
+            ? {
+                icon: <CircleCheck className="size-5" aria-hidden />,
+                title: "Agent clear",
+                description: "This agent has nothing outstanding.",
+                action: (
+                  <Button type="button" variant="outline" size="sm" onClick={() => goTab("all")}>
+                    View all requests
+                  </Button>
+                ),
+              }
+            : {
+                icon: <Inbox className="size-5" aria-hidden />,
+                title: "Every request lands here",
+                description: "The shared triage queue — you're all set.",
+                action: undefined as React.ReactNode,
+              };
+
   return (
     // Full-height frame: the 2.25rem subtraction matches the DeskShell
     // content column (pt-3 + pb-6), same formula as the board — the table
@@ -182,80 +264,63 @@ function QueueContent({ params, query }: { params: ReturnType<typeof readQueuePa
             </p>
           </Panel>
         )}
-        {queue.data && rows.length === 0 && !queue.isFetching && (
-          <Panel tone="night">
+        {isEmpty ? (
+          <Panel className="flex min-h-[320px] flex-col justify-center overflow-hidden">
             <EmptyState
-              tone="night"
-              title={
-                params.tab === "mine"
-                  ? "Your queue is clear"
-                  : params.tab === "by-agent"
-                    ? "Pick an agent to inspect their queue"
-                    : "Nothing here"
-              }
-              description={
-                params.tab === "unassigned"
-                  ? "No unassigned tickets. Nice — grab a coffee."
-                  : params.tab === "by-agent"
-                    ? "Choose an agent above — an empty pick never shows All."
-                    : params.tab === "all"
-                      ? "Every incoming request lives here — try widening the filters or search."
-                      : "Try widening the filters or search."
-              }
-              action={
-                params.tab !== "all" ? (
-                  <Button variant="outline" size="sm" onClick={() => window.history.back()}>
-                    Back
-                  </Button>
-                ) : undefined
-              }
+              icon={emptyState.icon}
+              title={emptyState.title}
+              description={emptyState.description}
+              action={emptyState.action}
             />
           </Panel>
-        )}
-        {/* Desktop: one data table (infinite scroll lives inside the scroll frame). Mobile: cards. */}
-        <div className="hidden lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
-          <TicketTable
-            tickets={rows}
-            role={role}
-            agents={agents}
-            focusedIndex={focusedIndex}
-            onFocusIndex={setFocusedIndex}
-            frameClassName="slim-scrollbar"
-            footer={
-              rows.length > 0 ? (
-                <ListEndStatus
-                  sentinelRef={desktopSentinelRef}
-                  hasNextPage={queue.hasNextPage}
-                  isFetchingNextPage={queue.isFetchingNextPage}
-                  total={rows.length}
-                />
-              ) : undefined
-            }
-          />
-        </div>
-        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pb-2 no-scrollbar lg:hidden">
-          {rows.map((ticket, index) => (
-            <QueueRow
-              key={ticket.id}
-              ticket={ticket}
-              role={role}
-              agents={agents}
-              index={index}
-              focused={index === focusedIndex}
-              onFocusIndex={setFocusedIndex}
-            />
-          ))}
-          {rows.length > 0 && (
-            <div className="flex shrink-0 justify-center pb-1">
-              <ListEndStatus
-                sentinelRef={mobileSentinelRef}
-                hasNextPage={queue.hasNextPage}
-                isFetchingNextPage={queue.isFetchingNextPage}
-                total={rows.length}
+        ) : (
+          <>
+            {/* Desktop: one data table (infinite scroll lives inside the scroll frame). Mobile: cards. */}
+            <div className="hidden lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
+              <TicketTable
+                tickets={rows}
+                role={role}
+                agents={agents}
+                focusedIndex={focusedIndex}
+                onFocusIndex={setFocusedIndex}
+                frameClassName="slim-scrollbar"
+                footer={
+                  rows.length > 0 ? (
+                    <ListEndStatus
+                      sentinelRef={desktopSentinelRef}
+                      hasNextPage={queue.hasNextPage}
+                      isFetchingNextPage={queue.isFetchingNextPage}
+                      total={rows.length}
+                    />
+                  ) : undefined
+                }
               />
             </div>
-          )}
-        </div>
+            <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pb-2 no-scrollbar lg:hidden">
+              {rows.map((ticket, index) => (
+                <QueueRow
+                  key={ticket.id}
+                  ticket={ticket}
+                  role={role}
+                  agents={agents}
+                  index={index}
+                  focused={index === focusedIndex}
+                  onFocusIndex={setFocusedIndex}
+                />
+              ))}
+              {rows.length > 0 && (
+                <div className="flex shrink-0 justify-center pb-1">
+                  <ListEndStatus
+                    sentinelRef={mobileSentinelRef}
+                    hasNextPage={queue.hasNextPage}
+                    isFetchingNextPage={queue.isFetchingNextPage}
+                    total={rows.length}
+                  />
+                </div>
+              )}
+            </div>
+          </>
+        )}
       </div>
       <KeyboardShortcutsHelp open={helpOpen} onOpenChange={setHelpOpen} />
     </div>

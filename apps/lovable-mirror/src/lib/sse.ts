@@ -54,6 +54,10 @@ export function useDeskEvents(enabled: boolean): DeskEvents {
   const [status, setStatus] = useState<SseStatus>("off");
   const [presence, setPresence] = useState<SsePresence | null>(null);
   const attempt = useRef(0);
+  // True once SSE has ever connected in this session. Cold-start failures
+  // stay "off" (indicator hidden) — "reconnecting" only shows after a drop
+  // from live, so local mock dev without a stream isn't noisy.
+  const everConnected = useRef(false);
 
   // Render-time adjustment (allowed): dropping to idle when disabled.
   if (!enabled && status !== "off") {
@@ -98,11 +102,12 @@ export function useDeskEvents(enabled: boolean): DeskEvents {
       try {
         next = new EventSource(`${config.apiUrl}/desk/events`, { withCredentials: true } as EventSourceInit);
       } catch {
-        // Constructor threw synchronously — retry on a tick (async, no render cascade).
+        // Constructor threw synchronously — retry silently unless we were
+        // previously live (no render cascade).
         attempt.current += 1;
         timer = setTimeout(() => {
           if (cancelled) return;
-          setStatus("reconnecting");
+          if (everConnected.current) setStatus("reconnecting");
           connect();
         }, Math.min(SSE_MIN_DELAY * 2 ** (attempt.current - 1), SSE_MAX_DELAY));
         return;
@@ -113,6 +118,7 @@ export function useDeskEvents(enabled: boolean): DeskEvents {
       source.addEventListener("presence", onPresence as EventListener);
       source.onopen = () => {
         attempt.current = 0;
+        everConnected.current = true;
         setStatus("live");
       };
       source.onerror = () => {
@@ -124,7 +130,7 @@ export function useDeskEvents(enabled: boolean): DeskEvents {
     function scheduleReconnect() {
       if (cancelled) return;
       attempt.current += 1;
-      setStatus("reconnecting");
+      if (everConnected.current) setStatus("reconnecting");
       const delay = Math.min(SSE_MIN_DELAY * 2 ** (attempt.current - 1), SSE_MAX_DELAY);
       timer = setTimeout(connect, delay);
     }

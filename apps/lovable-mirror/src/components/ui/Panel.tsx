@@ -83,7 +83,7 @@ export function EmptyState({
 }) {
   const night = tone === "night";
   return (
-    <div className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center">
+    <div className="flex min-h-[240px] flex-col items-center justify-center gap-3 px-6 py-12 text-center">
       {icon && (
         <span
           className={cn(

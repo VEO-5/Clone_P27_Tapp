@@ -7,6 +7,7 @@ import {
   ChevronsUpDown,
   Folder,
   History,
+  House,
   Inbox,
   Layers,
   LayoutDashboard,
@@ -364,8 +365,8 @@ function Sidebar({
   // into the URL and the target route never matches. Explicit `search: {}`
   // drops search at the boundary. Same lesson as the queueLinks comment.
   const overviewLink: SideLink = isAdmin
-    ? { to: "/desk/admin", search: {}, label: "Home", icon: LayoutDashboard, count: tickets.length || undefined, active: onAdminRouteEarly && pathname === "/desk/admin" }
-    : { to: "/desk", search: {}, label: "Overview", icon: LayoutDashboard, count: tickets.length || undefined, active: onBoard };
+    ? { to: "/desk/admin", search: {}, label: "Home", icon: House, count: tickets.length || undefined, active: onAdminRouteEarly && pathname === "/desk/admin" }
+    : { to: "/desk", search: {}, label: "Overview", icon: House, count: tickets.length || undefined, active: onBoard };
   const views: SideLink[] = [
     { to: "/desk/queue", search: { tab: "mine" }, label: "My Tickets", icon: UserRound, count: mine || undefined, active: unfilteredQueue && tab === "mine" },
   ];
