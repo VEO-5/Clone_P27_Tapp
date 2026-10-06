@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const APP_ROOT = join(HERE, "..", "..");
 const SRC_ROOT = join(APP_ROOT, "src");
-const API_SOURCE = readFileSync(join(APP_ROOT, "..", "..", "functions", "api.ts"), "utf8");
+const API_SOURCE = readFileSync(join(APP_ROOT, "_reference", "backend-api.reference.ts"), "utf8");
 
 function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

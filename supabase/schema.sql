@@ -9,8 +9,10 @@ create extension if not exists "pgcrypto";
 -- ---------------------------------------------------------------------------
 
 do $$ begin
-  create type ticket_status as enum ('open', 'in_progress', 'resolved', 'closed');
+  create type ticket_status as enum ('pending', 'open', 'in_progress', 'resolved', 'closed');
 exception when duplicate_object then null; end $$;
+-- Lead lock 2026-10-06: superset resolves contracts-vs-sql drift.
+-- Existing DBs: ALTER TYPE ticket_status ADD VALUE IF NOT EXISTS 'pending';
 
 do $$ begin
   create type ticket_priority as enum ('low', 'medium', 'high', 'urgent');

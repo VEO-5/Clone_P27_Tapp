@@ -14,7 +14,7 @@
     "jsx": "react-jsx",
     "paths": {
       "@/*": ["./src/*"],
-      "@pearl27/contracts": ["./src/lib/contracts.vendored.ts"]
+      "@pearl27/contracts": ["./src/lib/contracts.ts"]
     },
     "types": ["vite/client"]
   },

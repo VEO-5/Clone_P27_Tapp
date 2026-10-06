@@ -1,6 +1,0 @@
-{
-  "framework": "vite",
-  "buildCommand": "pnpm --filter @pearl27/lovable-mirror build",
-  "outputDirectory": "apps/lovable-mirror/dist",
-  "installCommand": "pnpm install"
-}

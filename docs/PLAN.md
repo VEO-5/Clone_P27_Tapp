@@ -48,6 +48,28 @@ where already established). No `features/*` barrels — use deep imports
 2. **Track:** GET by reference (exact) or email (list). Detail page renders status, timeline, signed URLs (60-min expiry) for attachments.
 3. **Admin:** sign in with an invited work email → session cookie → dashboard fetches via role-gated routes → PATCH status writes `status_changed` event, stamps `resolved_at`, fires resolution email. Deactivation demotes to employee; unknown addresses can only ever be employees.
 
+## Lovable-Modern lock (lead decision 2026-10-06)
+
+- Target: TanStack Start SSR (Modern, `tech_stack:modern`), keep file-based
+  TanStack Router (`src/routes/*`, `router.tsx`, `routeTree.gen.ts`). No
+  `react-router-dom` downgrade, no Drizzle (`supabase-js` direct stays).
+- Backend: own Supabase project (direct ownership, dashboard-managed Google
+  OAuth). Secrets server-only via Workers bindings / `createServerFn`;
+  `VITE_*` public only.
+- Enum winner (resolves BACKEND_HANDOFF drift): superset
+  `pending|open|in_progress|resolved|closed`. Contracts Zod is source of truth;
+  `supabase/schema.sql` enum must be migrated to match before RLS work.
+- Git safety: `pre-lovable-modern` tag + `pre-flatten-backup` stash preserve
+  history. Flatten executes on `chore/lovable-modern`, no `reset --hard`.
+- 2026-10-06 status: flatten DONE + Bun primary (`bun.lock`, pnpm removed,
+  `package-lock.json` dropped, Vercel uses `bun install`/`bun run build`).
+  `typecheck` + `test` (55) + `build` green. TanStack Start SSR parked locally
+  (hung at transform; `vite.config.ts` stays SPA, Start deps + `src/server.ts`
+  stub kept for import day — Lovable runs its own Modern upgrade). InsForge SDK
+  kept (auth/session/export wired to it); `src/lib/supabase.ts` anon client
+  added alongside for phased migration. RLS migration staged at
+  `supabase/migrations_rls_modern.sql` (policies still to finalize).
+
 ## Risk log
 
 | Risk | Mitigation |

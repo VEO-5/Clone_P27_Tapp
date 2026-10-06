@@ -66,7 +66,7 @@ export async function waitForAuthHydration(timeoutMs = 4000): Promise<boolean> {
   restoreSession();
   try {
     const settled = await Promise.race([
-      insforge.getHttpClient().getValidAccessToken().then((t) => t),
+      insforge.getHttpClient().getValidAccessToken().then((t: string | null) => t),
       new Promise<null>((resolve) => window.setTimeout(() => resolve(null), timeoutMs)),
     ]);
     return settled !== null;

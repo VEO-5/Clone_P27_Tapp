@@ -1,3 +1,0 @@
-# Mirror-only build output (throwaway scaffold; real Lovable scaffold is source of truth)
-dist/
-.tanstack/

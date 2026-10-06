@@ -4,7 +4,7 @@ import { z } from "zod";
 // Enums — single source of truth. The web app never hard-codes these.
 // ---------------------------------------------------------------------------
 
-export const TicketStatus = z.enum(["pending", "open", "in_progress", "resolved"]);
+export const TicketStatus = z.enum(["pending", "open", "in_progress", "resolved", "closed"]);
 export type TicketStatus = z.infer<typeof TicketStatus>;
 
 export const TicketPriority = z.enum(["low", "medium", "high", "urgent"]);
@@ -30,6 +30,7 @@ export const STATUS_LABELS: Record<TicketStatus, string> = {
   open: "Open",
   in_progress: "In progress",
   resolved: "Resolved",
+  closed: "Closed",
 };
 
 export const PRIORITY_LABELS: Record<TicketPriority, string> = {
