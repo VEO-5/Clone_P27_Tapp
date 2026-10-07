@@ -48,7 +48,6 @@ import { EditProfileDialog } from "@/features/auth/EditProfileDialog";
 import { useSession, useSignOut } from "@/features/auth/useSession";
 import { ReportIssueSheet } from "@/features/tickets/ReportIssueSheet";
 import { apiFetch } from "@/lib/api";
-import { config } from "@/lib/config";
 import { cn } from "@/lib/utils";
 
 const COLLAPSED_KEY = "desk-sidebar-collapsed";
@@ -279,11 +278,9 @@ function SidebarFooter({ collapsed }: { collapsed: boolean }) {
             <DropdownMenuItem onSelect={() => setReportOpen(true)}>
               <TicketIcon aria-hidden /> Submit a ticket
             </DropdownMenuItem>
-            {!config.apiMock && (
-              <DropdownMenuItem onSelect={() => setProfileOpen(true)}>
-                <Pencil aria-hidden /> Edit profile
-              </DropdownMenuItem>
-            )}
+            <DropdownMenuItem onSelect={() => setProfileOpen(true)}>
+              <Pencil aria-hidden /> Edit profile
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => void signOut()}>
               <LogOut aria-hidden /> Sign out
@@ -291,9 +288,7 @@ function SidebarFooter({ collapsed }: { collapsed: boolean }) {
           </DropdownMenuContent>
         </DropdownMenu>
         <ReportIssueSheet open={reportOpen} onOpenChange={setReportOpen} />
-        {!config.apiMock && (
-          <EditProfileDialog open={profileOpen} onOpenChange={setProfileOpen} profile={session.data} />
-        )}
+        <EditProfileDialog open={profileOpen} onOpenChange={setProfileOpen} profile={session.data} />
       </div>
     </div>
   );

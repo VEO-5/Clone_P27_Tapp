@@ -1,26 +1,13 @@
 /**
- * MIRROR config — mirrors apps/web/src/lib/config.ts with the Phase 4.2 rename.
- * NEXT_PUBLIC_API_URL -> VITE_API_URL, NEXT_PUBLIC_API_MOCK -> VITE_API_MOCK.
- * Fallback + incident comment preserved: a missing variable must never look
- * like a working app (mock defaults ON locally; prod sets VITE_API_MOCK=false).
+ * App config — single production backend. A missing VITE_API_URL must never
+ * look like a working app: warn loudly in dev instead of falling back.
  */
 export const config = {
   get apiUrl(): string {
-    const value = import.meta.env.VITE_API_URL as string | undefined;
-    return value?.trim() || "http://localhost:4000";
-  },
-  get apiMock(): boolean {
-    const value = import.meta.env.VITE_API_MOCK as string | undefined;
-    return value?.trim().toLowerCase() !== "false";
-  },
-  get insforgeUrl(): string {
-    return (import.meta.env.VITE_INSFORGE_URL as string | undefined)?.trim() ?? "";
-  },
-  get insforgeAnonKey(): string {
-    return (import.meta.env.VITE_INSFORGE_ANON_KEY as string | undefined)?.trim() ?? "";
-  },
-  /** True when live InsForge calls are possible (mock off + URL/key present). */
-  get insforgeLive(): boolean {
-    return !this.apiMock && Boolean(this.insforgeUrl && this.insforgeAnonKey);
+    const url = (import.meta.env.VITE_API_URL as string | undefined)?.trim() ?? "";
+    if (!url && import.meta.env.DEV) {
+      console.warn("[config] VITE_API_URL is empty — data calls will fail. Point it at the API server.");
+    }
+    return url;
   },
 } as const;

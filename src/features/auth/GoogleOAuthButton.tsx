@@ -6,17 +6,17 @@ import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/shadcn/button";
+import { landingTarget } from "@/lib/landing";
 import { queryKeys } from "@/lib/query";
 
-import { landingTarget } from "./mockSession";
 import {
   completeGoogleSignIn,
   consumeOAuthAttempt,
-  hasLiveSession,
+  hasSupabaseSession,
   peekOAuthAttempt,
   readOAuthReturn,
   startGoogleSignIn,
-} from "./googleOAuth";
+} from "./supabase-auth";
 
 function GoogleMark() {
   return (
@@ -41,7 +41,7 @@ function GoogleMark() {
   );
 }
 
-/** One-click Google entrypoint for live mode. OTP stays below as fallback. */
+/** One-click Google entrypoint (Supabase OAuth). OTP stays below as fallback. */
 export function GoogleOAuthButton({ next }: { next?: string }) {
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -79,12 +79,10 @@ export function GoogleOAuthButton({ next }: { next?: string }) {
 /**
  * Completes Google sign-in after the redirect back to `/sign-in`.
  *
- * Must NOT gate on `?insforge_code=` in the URL: the SDK strips that param
- * synchronously at import time and exchanges it in the background, so by
- * mount time it is always gone. Instead: settle, check for a session token,
- * and only then resolve the role + navigate. A fresh OAuth attempt with no
- * session means the return died (exchange failed, wrong tab, storage off) —
- * that must surface an error, never a silent sit on the sign-in page.
+ * Supabase auto-exchanges ?code= on load, so by mount time the session is
+ * usually already present. The takeover only appears when the URL carries a
+ * return or this tab recently left for Google; anything else surfaces an
+ * error, never a silent sit on the sign-in page.
  */
 export function GoogleCallbackHandler({
   next,
@@ -100,15 +98,15 @@ export function GoogleCallbackHandler({
   // Peek once (non-destructive, StrictMode-safe): did THIS tab recently
   // leave for Google? The effect consumes the flag when it acts on it.
   const [attempted] = useState(peekOAuthAttempt);
-  // Capture the OAuth return params at mount (non-destructive read). With
-  // auto-detect off, a fresh return carries ?insforge_code= but no session
-  // yet — that combination is exactly what must trigger completion.
+  // Capture the OAuth return params at mount (non-destructive read). A fresh
+  // return carries ?code= with the session still settling — that combination
+  // is exactly what must trigger completion.
   const [returned] = useState(readOAuthReturn);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const session = await hasLiveSession();
+      const session = await hasSupabaseSession();
       if (!session && !returned.code && !returned.error) {
         if (!cancelled && attempted) {
           consumeOAuthAttempt();

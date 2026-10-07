@@ -1,6 +1,6 @@
 import { config } from "./config";
 import { trackApiCall, trackApiError } from "./analytics";
-import { liveFetch } from "./live";
+import { supabase } from "./supabase";
 
 export interface ApiErrorShape {
   error: {
@@ -60,20 +60,26 @@ async function parseError(res: Response): Promise<ApiError> {
 }
 
 /**
- * Thin fetch wrapper. Mock mode: base URL from VITE_API_URL (renamed from
- * NEXT_PUBLIC_API_URL), session cookie via credentials:include.
- * Live mode (VITE_API_MOCK=false + InsForge env): routes through the `api`
- * Edge Function with the user's Bearer token — same path + error contract.
+ * Thin fetch wrapper. Base URL from VITE_API_URL, session via credentials
+ * plus the Supabase access-token Bearer — same path + error contract
+ * everywhere. The server validates the Supabase JWT.
  */
 export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
-  if (config.insforgeLive) return liveFetch<T>(path, init);
+  let token: string | null = null;
+  try {
+    token = (await supabase.auth.getSession()).data.session?.access_token ?? null;
+  } catch {
+    token = null;
+  }
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...((init.headers ?? {}) as Record<string, string>),
+  };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
   const res = await fetch(`${config.apiUrl}${path}`, {
     ...init,
     credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...(init.headers ?? {}),
-    },
+    headers,
   });
   if (!res.ok) {
     const err = await parseError(res);

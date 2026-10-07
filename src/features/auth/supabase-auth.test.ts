@@ -1,17 +1,18 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  assertWorkEmail,
   exchangeErrorMessage,
   isFreshOAuthAttempt,
   OAUTH_ATTEMPT_TTL_MS,
   oauthStartMessage,
   parseOAuthReturn,
   shouldShowOAuthLoader,
-} from "./googleOAuth";
+} from "./supabase-auth";
 
 // Guards the "never a silent sit on the sign-in page" invariant: the OAuth
-// attempt flag is the only signal that survives the SDK stripping
-// ?insforge_code= at import time, so its freshness math must be exact.
+// attempt flag is the only signal that survives the round-trip to Google, so
+// its freshness math must be exact.
 describe("isFreshOAuthAttempt", () => {
   const NOW = 1_800_000_000_000;
 
@@ -39,9 +40,9 @@ describe("isFreshOAuthAttempt", () => {
   });
 });
 
-describe("parseOAuthReturn", () => {
+describe("parseOAuthReturn (Supabase ?code= flow)", () => {
   it("reads code and error params", () => {
-    expect(parseOAuthReturn("?insforge_code=abc123")).toEqual({ code: "abc123", error: null });
+    expect(parseOAuthReturn("?code=abc123")).toEqual({ code: "abc123", error: null });
     expect(parseOAuthReturn("?error=access_denied")).toEqual({ code: null, error: "access_denied" });
   });
 
@@ -51,18 +52,18 @@ describe("parseOAuthReturn", () => {
   });
 
   it("trims blanks and survives garbage", () => {
-    expect(parseOAuthReturn("?insforge_code=%20%20")).toEqual({ code: null, error: null });
+    expect(parseOAuthReturn("?code=%20%20")).toEqual({ code: null, error: null });
     expect(parseOAuthReturn("%%%")).toEqual({ code: null, error: null });
   });
 });
 
 describe("shouldShowOAuthLoader", () => {
   it("shows takeover for an OAuth return even without a flag", () => {
-    expect(shouldShowOAuthLoader("?insforge_code=abc", false)).toBe(true);
+    expect(shouldShowOAuthLoader("?code=abc", false)).toBe(true);
     expect(shouldShowOAuthLoader("?error=access_denied", false)).toBe(true);
   });
 
-  it("shows takeover for a fresh attempt even after params are stripped", () => {
+  it("shows takeover for a fresh attempt even after params are consumed", () => {
     expect(shouldShowOAuthLoader("", true)).toBe(true);
     expect(shouldShowOAuthLoader("?next=%2Fdesk", true)).toBe(true);
   });
@@ -72,46 +73,28 @@ describe("shouldShowOAuthLoader", () => {
     expect(shouldShowOAuthLoader("?next=%2Fdesk", false)).toBe(false);
   });
 });
-describe("exchangeErrorMessage", () => {
-  it("explains a lost PKCE verifier", () => {
-    expect(exchangeErrorMessage({ error: "PKCE_VERIFIER_MISSING", message: "x", statusCode: 400 })).toContain(
-      "expired before completing",
-    );
+
+describe("assertWorkEmail", () => {
+  it("accepts work addresses (normalized)", () => {
+    expect(assertWorkEmail("Ada@pearl27.com ")).toBe("ada@pearl27.com");
   });
 
-  it("surfaces backend message plus guidance", () => {
-    const message = exchangeErrorMessage({
-      message: "Invalid code",
-      statusCode: 400,
-      error: "INVALID_CODE",
-      nextActions: "Start again.",
-    });
-    expect(message).toContain("Invalid code");
-    expect(message).toContain("Start again.");
-  });
-
-  it("falls back when empty", () => {
-    expect(exchangeErrorMessage(null)).toBe("Google sign-in didn't complete. Try again.");
+  it("rejects non-work addresses", () => {
+    expect(() => assertWorkEmail("ada@gmail.com")).toThrow(/pearl27\.com/);
+    expect(() => assertWorkEmail("not-an-email")).toThrow();
+    expect(() => assertWorkEmail("")).toThrow();
   });
 });
-describe("oauthStartMessage", () => {
-  it("falls back when the error carries nothing useful", () => {
-    expect(oauthStartMessage(null)).toBe("Couldn't start Google sign-in. Try again.");
-    expect(oauthStartMessage({})).toBe("Couldn't start Google sign-in. Try again.");
+
+describe("oauth error messages", () => {
+  it("surfaces start failures with a fallback", () => {
+    expect(oauthStartMessage({ message: "redirect not allowed" })).toBe("redirect not allowed");
+    expect(oauthStartMessage(null)).toMatch(/Try again/);
   });
 
-  it("appends backend guidance for rejected redirect URLs", () => {
-    const message = oauthStartMessage({
-      message: "Redirect URI not allowed: https://x/sign-in",
-      statusCode: 400,
-      nextActions: "Add it to allowedRedirectUrls.",
-    });
-    expect(message).toContain("Redirect URI not allowed");
-    expect(message).toContain("Add it to allowedRedirectUrls.");
-  });
-
-  it("does not append guidance for non-400 errors", () => {
-    const message = oauthStartMessage({ message: "Boom", statusCode: 500, nextActions: "Nope." });
-    expect(message).toBe("Boom");
+  it("explains expired PKCE flows", () => {
+    expect(exchangeErrorMessage({ code: "PKCE_VERIFIER_MISSING" })).toMatch(/expired/);
+    expect(exchangeErrorMessage({ message: "boom" })).toBe("boom");
+    expect(exchangeErrorMessage(null)).toMatch(/Try again/);
   });
 });

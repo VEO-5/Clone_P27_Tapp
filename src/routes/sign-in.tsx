@@ -4,34 +4,26 @@ import { useEffect, useState } from "react";
 
 import { Panel, PanelHeader } from "@/components/ui/Panel";
 import { Button } from "@/components/shadcn/button";
-import { DemoResetButton } from "@/features/auth/DemoResetButton";
 import { EmailSignInForm } from "@/features/auth/EmailSignInForm";
 import { GoogleCallbackHandler, GoogleOAuthButton } from "@/features/auth/GoogleOAuthButton";
-import { MockSignInButtons } from "@/features/auth/MockSignInButtons";
 import {
   peekOAuthAttempt,
   shouldShowOAuthLoader,
-} from "@/features/auth/googleOAuth";
-import { config } from "@/lib/config";
+} from "@/features/auth/supabase-auth";
 import { signInSearchSchema } from "@/lib/auth-guard";
 
 /** Slow-completion fallback: a spinner must never look infinite. */
 const OAUTH_SLOW_MS = 20_000;
 
-// Mirrors apps/web/src/app/(public)/sign-in/page.tsx (title "Sign in").
 // ?next= is typed per route — after login the app navigates there (FE-L-4.6).
-// Mock-only helpers (quick-pick roles, demo reset) render only in mock mode;
-// live mode uses the passwordless OTP form above.
 export const Route = createFileRoute("/sign-in")({
   validateSearch: signInSearchSchema,
   head: () => ({ meta: [{ title: "Sign in · Pearl 27" }] }),
   component: function SignInComponent() {
     const { next } = Route.useSearch();
-    const mock = config.apiMock;
     // OAuth takeover: decided synchronously at mount (zero form-flash).
-    // Live mode only — mock mode has no Google flow.
     const [oauthBusy, setOauthBusy] = useState(
-      () => !mock && shouldShowOAuthLoader(window.location.search, peekOAuthAttempt()),
+      () => shouldShowOAuthLoader(window.location.search, peekOAuthAttempt()),
     );
     const [oauthError, setOauthError] = useState<string | null>(null);
     const [oauthSlow, setOauthSlow] = useState(false);
@@ -92,30 +84,22 @@ export const Route = createFileRoute("/sign-in")({
           <PanelHeader
             eyebrow="Sign in"
             title="Sphere Support"
-            description={
-              mock
-                ? "Use your Pearl 27 work email — we recognize your role. Admins invite agents and admins; everyone else signs in as an employee, no account needed."
-                : undefined
-            }
+            description={undefined}
           />
           <div className="flex flex-col gap-4 p-6 sm:p-8">
-            {!mock && oauthError && (
+            {oauthError && (
               <p role="alert" className="text-[13px] text-rose-600">
                 {oauthError}
               </p>
             )}
-            {!mock && <GoogleCallbackHandler next={next ?? "/"} />}
-            {!mock && <GoogleOAuthButton next={next ?? "/"} />}
-            {!mock && (
-              <p aria-hidden className="flex items-center gap-3 text-[11px] font-medium uppercase tracking-[0.12em] text-fog">
-                <span aria-hidden className="h-px flex-1 bg-ink-700" />
-                or email code
-                <span aria-hidden className="h-px flex-1 bg-ink-700" />
-              </p>
-            )}
+            <GoogleCallbackHandler next={next ?? "/"} />
+            <GoogleOAuthButton next={next ?? "/"} />
+            <p aria-hidden className="flex items-center gap-3 text-[11px] font-medium uppercase tracking-[0.12em] text-fog">
+              <span aria-hidden className="h-px flex-1 bg-ink-700" />
+              or email code
+              <span aria-hidden className="h-px flex-1 bg-ink-700" />
+            </p>
             <EmailSignInForm next={next ?? "/"} />
-            {mock && <MockSignInButtons next={next ?? "/"} />}
-            {mock && <DemoResetButton />}
           </div>
         </Panel>
       </div>

@@ -44,7 +44,6 @@ export const PUBLIC_PREFIXES = [
   "/_next",
   "/favicon.ico",
   "/pearl27-logo.png",
-  "/mockServiceWorker.js",
   "/sw.js",
   "/manifest.webmanifest",
   "/icon.svg",

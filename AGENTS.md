@@ -1,22 +1,24 @@
 # AGENTS.md
 
-<!-- INSFORGE:START -->
-## InsForge backend
+## Supabase backend
 
-This project uses [InsForge](https://insforge.dev): an all-in-one, open-source Postgres-based backend (BaaS) that gives this app a database, authentication, file storage, edge functions, realtime, an AI model gateway, and payments through one platform.
+This project uses **Supabase**: Postgres database, Auth (Google OAuth +
+passwordless email OTP), private Storage (`ticket-attachments`), and RLS.
 
-- **Project:** **pearl27-ticketing** (API base `https://6r6mz2vp.us-east.insforge.app`)
-- **Skills:** these InsForge skills are installed for supported coding agents. Reach for them before implementing any InsForge feature instead of guessing the API:
-  - `insforge`: app code with the `@insforge/sdk` client (database CRUD, auth, storage, edge functions, realtime, AI, email, and Stripe payments).
-  - `insforge-cli`: backend and infrastructure via the `insforge` CLI (projects, SQL, migrations, RLS policies, storage buckets, functions, secrets, payment setup, schedules, deploys).
-  - `insforge-debug`: diagnosing failures (SDK/HTTP errors, RLS denials, auth and OAuth issues) and running security or performance audits.
-  - `insforge-integrations`: wiring external auth providers (Clerk, Auth0, WorkOS, Better Auth, etc.) for JWT-based RLS, or the OKX x402 payment facilitator.
-  - `find-skills`: discovering additional skills on demand.
-- **Credentials:** app code reads keys from `.env.local`; the CLI reads `.insforge/project.json`. Never hardcode or commit keys.
+- **Auth:** `src/features/auth/supabase-auth.ts` (Supabase Auth only — no
+  third-party BaaS SDK). Session via `supabase.auth.getSession()` +
+  `onAuthStateChange`; role resolves server-side (`GET /auth/me` → profiles).
+- **API transport:** `src/lib/api.ts` `apiFetch` → `VITE_API_URL` with the
+  Supabase access-token Bearer. The server validates the Supabase JWT.
+- **RLS:** live model in `migrations/` (v1) + user-scoped Phase-1 policies in
+  `supabase/migrations/20261006_user_scoped_rls.sql`. Reference users with
+  `auth.users(id)`; use `auth.uid()` in RLS policies.
+- **Credentials:** app code reads `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`
+  from `.env.local`. Server-only secrets never use the `VITE_` prefix. Never
+  hardcode or commit keys.
 
 Key patterns:
 
+- No mock layer: `src/mocks/` + MSW were deleted 2026-10-06. No `VITE_API_MOCK`.
 - Database inserts take an array: `insert([{ ... }])`.
-- Reference users with `auth.users(id)`; use `auth.uid()` in RLS policies.
 - For storage uploads, persist both the returned `url` and `key`.
-<!-- INSFORGE:END -->

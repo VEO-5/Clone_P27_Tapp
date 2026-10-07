@@ -71,9 +71,8 @@ export function trackEvent(name: string, props?: Record<string, unknown>): void 
 }
 
 /**
- * Domain events derived from API calls (single choke point in apiFetch /
- * liveFetch, so mock + live modes both report). Only successful calls reach
- * here — callers invoke this after a 2xx.
+ * Domain events derived from API calls (single choke point in apiFetch).
+ * Only successful calls reach here — callers invoke this after a 2xx.
  */
 export function trackApiCall(
   method: string,

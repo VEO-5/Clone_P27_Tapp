@@ -5,10 +5,10 @@ import { Skeleton } from "@/components/shadcn/skeleton";
 import { AdminTable } from "@/features/admin/AdminTable";
 import { apiFetch } from "@/lib/api";
 import { queryKeys } from "@/lib/query";
-import type { MockAgent } from "@/mocks/fixtures";
+import type { AdminMember } from "@/features/admin/members";
 export const Route = createFileRoute("/desk/admin/admins")({
   component: function AdminsRoute() {
-    const admins = useQuery({ queryKey: [...queryKeys.me, "admins"], queryFn: () => apiFetch<MockAgent[]>("/admin/admins") });
+    const admins = useQuery({ queryKey: [...queryKeys.me, "admins"], queryFn: () => apiFetch<AdminMember[]>("/admin/admins") });
     return (
       <Panel lit>
         <PanelHeader eyebrow="Admin \u00b7 Admins" title="Admin management" description="Invite and manage workspace admins." />

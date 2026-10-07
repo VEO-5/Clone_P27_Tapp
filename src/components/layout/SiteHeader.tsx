@@ -15,7 +15,6 @@ import { Skeleton } from "@/components/shadcn/skeleton";
 import { EditProfileDialog } from "@/features/auth/EditProfileDialog";
 import { useSignOut } from "@/features/auth/useSession";
 import { ReportIssueSheet } from "@/features/tickets/ReportIssueSheet";
-import { config } from "@/lib/config";
 import type { Profile } from "@/lib/contracts.vendored";
 import { cn } from "@/lib/utils";
 
@@ -183,24 +182,20 @@ export function SiteHeader({
                     </span>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  {!config.apiMock && (
-                    <DropdownMenuItem onSelect={() => setProfileOpen(true)}>
-                      <Pencil aria-hidden /> Edit profile
-                    </DropdownMenuItem>
-                  )}
+                  <DropdownMenuItem onSelect={() => setProfileOpen(true)}>
+                    <Pencil aria-hidden /> Edit profile
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => void signOut()}>
                     <LogOut aria-hidden /> Sign out
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-              {!config.apiMock && (
-                <EditProfileDialog
-                  open={profileOpen}
-                  onOpenChange={setProfileOpen}
-                  profile={employeeProfile}
-                />
-              )}
+              <EditProfileDialog
+                open={profileOpen}
+                onOpenChange={setProfileOpen}
+                profile={employeeProfile}
+              />
             </>
           )}
         </div>

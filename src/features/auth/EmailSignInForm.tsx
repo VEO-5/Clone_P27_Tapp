@@ -7,16 +7,14 @@ import { useEffect, useState } from "react";
 
 import { Button } from "@/components/shadcn/button";
 import { Field, Input } from "@/components/ui/Form";
-import { config } from "@/lib/config";
+import { landingTarget } from "@/lib/landing";
 import { queryKeys } from "@/lib/query";
 
-import { landingTarget, mockSignInWithEmail } from "./mockSession";
-import { liveRequestCode, liveVerifyCode } from "./liveSession";
+import { requestEmailCode, verifyEmailCode } from "./supabase-auth";
 
 /**
- * Email sign-in. Mock mode: any @pearl27.com address works via the worker.
- * Live mode (VITE_API_MOCK=false): passwordless InsForge OTP — email first,
- * then a 6-digit code. New addresses become employees; roles resolve
+ * Email sign-in via Supabase passwordless OTP — email first, then a 6-digit
+ * code. New @pearl27.com addresses become employees; roles resolve
  * server-side from profiles.
  */
 export function EmailSignInForm({ next }: { next?: string }) {
@@ -30,7 +28,6 @@ export function EmailSignInForm({ next }: { next?: string }) {
   // Resend cooldown: stops resend-storms from tripping send throttles and
   // matches the backend minimum interval between auth emails.
   const [cooldownLeft, setCooldownLeft] = useState(0);
-  const live = config.insforgeLive;
 
   useEffect(() => {
     if (cooldownLeft <= 0) return;
@@ -56,16 +53,9 @@ export function EmailSignInForm({ next }: { next?: string }) {
     setError(null);
     setSigningIn(true);
     try {
-      if (!live) {
-        const { landing, profile } = await mockSignInWithEmail(value);
-        if (profile) queryClient.setQueryData(queryKeys.me, profile);
-        else await queryClient.invalidateQueries({ queryKey: queryKeys.me });
-        navigate({ to: landingTarget(next, landing) });
-        return;
-      }
       if (!codeSent) {
         try {
-          await liveRequestCode(value);
+          await requestEmailCode(value);
         } catch (cause) {
           setError(friendlySendError(cause));
           return;
@@ -78,7 +68,7 @@ export function EmailSignInForm({ next }: { next?: string }) {
         setError("Enter the 6-digit code from your email");
         return;
       }
-      const { landing, profile } = await liveVerifyCode(value.toLowerCase(), code);
+      const { landing, profile } = await verifyEmailCode(value.toLowerCase(), code);
       if (profile) queryClient.setQueryData(queryKeys.me, profile);
       else await queryClient.invalidateQueries({ queryKey: queryKeys.me });
       navigate({ to: landingTarget(next, landing) });
@@ -91,20 +81,20 @@ export function EmailSignInForm({ next }: { next?: string }) {
 
   return (
     <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-3" noValidate={false}>
-      <Field htmlFor="mock-email" label="Work email">
+      <Field htmlFor="work-email" label="Work email">
         <Input
-          id="mock-email"
+          id="work-email"
           type="email"
           autoComplete="email"
           placeholder="you@pearl27.com"
           value={email}
-          disabled={signingIn || (live && codeSent)}
+          disabled={signingIn || codeSent}
           onChange={(event) => setEmail(event.target.value)}
-          aria-describedby={error ? "mock-email-error" : undefined}
+          aria-describedby={error ? "work-email-error" : undefined}
           aria-invalid={Boolean(error) || undefined}
         />
       </Field>
-      {live && codeSent && (
+      {codeSent && (
         <Field htmlFor="email-code" label="6-digit code">
           <Input
             id="email-code"
@@ -115,21 +105,21 @@ export function EmailSignInForm({ next }: { next?: string }) {
             value={code}
             disabled={signingIn}
             onChange={(event) => setCode(event.target.value)}
-            aria-describedby={error ? "mock-email-error" : undefined}
+            aria-describedby={error ? "work-email-error" : undefined}
             aria-invalid={Boolean(error) || undefined}
           />
         </Field>
       )}
       {error && (
-        <p id="mock-email-error" role="alert" className="text-[13px] text-rose-600">
+        <p id="work-email-error" role="alert" className="text-[13px] text-rose-600">
           {error}
         </p>
       )}
       <Button type="submit" disabled={signingIn} aria-busy={signingIn || undefined}>
         {signingIn ? <Loader2 className="animate-spin" aria-hidden /> : <Mail className="size-4" aria-hidden />}
-        {live ? (codeSent ? "Verify code" : "Send code") : "Continue with email"}
+        {codeSent ? "Verify code" : "Send code"}
       </Button>
-      {live && codeSent && (
+      {codeSent && (
         <div className="flex items-center justify-between gap-3">
           <button
             type="button"
@@ -138,7 +128,7 @@ export function EmailSignInForm({ next }: { next?: string }) {
               const value = email.trim();
               if (!value || signingIn) return;
               setSigningIn(true);
-              liveRequestCode(value)
+              requestEmailCode(value)
                 .then(() => {
                   setError(null);
                   setCooldownLeft(60);

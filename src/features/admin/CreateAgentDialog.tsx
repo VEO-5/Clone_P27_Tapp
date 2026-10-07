@@ -15,10 +15,10 @@ import {
 import { Input } from "@/components/shadcn/input";
 import { Label } from "@/components/shadcn/label";
 import { apiFetch, ApiError } from "@/lib/api";
-import { recordMockDirectory, type MockAgent } from "@/mocks/fixtures";
+import type { AdminMember } from "./members";
 
 /** Create-agent dialog: single email field, domain validated inline before any request. */
-export function CreateAgentDialog({ onCreated }: { onCreated: (agent: MockAgent) => void }) {
+export function CreateAgentDialog({ onCreated }: { onCreated: (agent: AdminMember) => void }) {
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -34,13 +34,10 @@ export function CreateAgentDialog({ onCreated }: { onCreated: (agent: MockAgent)
     setError(null);
     setSaving(true);
     try {
-      const agent = await apiFetch<MockAgent>("/admin/agents", {
+      const agent = await apiFetch<AdminMember>("/admin/agents", {
         method: "POST",
         body: JSON.stringify({ email: parsed.data.email }),
       });
-      // Journal the invite so it survives worker restarts (page reloads) —
-      // MockProvider replays it into the worker on every boot.
-      recordMockDirectory({ role: "agent", email: agent.email, name: agent.name, status: agent.status });
       onCreated(agent);
       setOpen(false);
       setEmail("");

@@ -10,7 +10,12 @@
 | P3 | UI: submit form + confirmation, tracking pages, admin dashboard | 30–50 min |
 | P4 | Wire env, smoke test, git commits, deploy to Vercel, walkthrough notes | 50–60 min |
 
-## Architecture (current: `apps/web`, Next.js 16)
+## Architecture — updated 2026-10-06 (below was: `apps/web`, Next.js 16)
+
+> Current truth: single Vite + TanStack Router SPA at repo root (`src/`,
+> `src/routes/*`, `src/features/*`, `src/components/*`, `src/lib/*`),
+> contracts vendored (`src/lib/contracts.ts`), Bun (`bun.lock`), Vercel builds
+> `bun run build` → `dist/`. The tree below is the original assessment scaffold.
 
 ```
 apps/web/src/                  # Next.js 16 App Router + React 19 — UI + API routes
@@ -65,10 +70,11 @@ where already established). No `features/*` barrels — use deep imports
   `package-lock.json` dropped, Vercel uses `bun install`/`bun run build`).
   `typecheck` + `test` (55) + `build` green. TanStack Start SSR parked locally
   (hung at transform; `vite.config.ts` stays SPA, Start deps + `src/server.ts`
-  stub kept for import day — Lovable runs its own Modern upgrade). InsForge SDK
-  kept (auth/session/export wired to it); `src/lib/supabase.ts` anon client
-  added alongside for phased migration. RLS migration staged at
-  `supabase/migrations_rls_modern.sql` (policies still to finalize).
+   stub kept for import day — Lovable runs its own Modern upgrade). InsForge SDK
+   removed 2026-10-06 (no InsForge anywhere); auth/session/export rewired to
+   Supabase Auth (`src/features/auth/supabase-auth.ts`); `src/lib/supabase.ts` anon client
+  is the session + direct-read path. RLS Phase-1 FINALIZED at
+  `supabase/migrations/20261006_user_scoped_rls.sql` (run in Supabase SQL editor).
 
 ## Risk log
 

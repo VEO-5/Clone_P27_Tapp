@@ -1,16 +1,21 @@
 # Walkthrough — Sphere Support Desk
 
+> Stack-note (2026-10-06): the "Stack" section below describes the original
+> assessment scaffold (Next.js). Current truth: single Vite + TanStack Router
+> SPA at repo root (Bun, `bun run dev` → :8080), own Supabase project backend.
+> See `docs/PLAN.md` "Lovable-Modern lock". Demo path + talking points unchanged.
+
 A five-minute demo script for the live assessment.
 
 ## What this is
 
 Pearl 27 employees submit Sphere account issues, attach screenshots, and track status with a reference like `PRL-7K4M2X`. System Support triages from a gated dashboard. Email notifications fire when configured; without Resend the app still works and logs instead.
 
-## Stack (and why)
+## Stack (and why) — updated 2026-10-06 (was: Next.js App Router)
 
-- **Next.js App Router + TypeScript** — UI and Node backend in one deploy. Route handlers are the backend.
-- **Supabase Postgres + private Storage** — schema in `supabase/schema.sql`. Without keys, a local `.data/` store keeps the demo running.
-- **Access-code admin session** — HMAC-signed HttpOnly cookie. Upgrade path: Supabase Auth + roles.
+- **Vite + TanStack Router (SPA) + TypeScript** — single app at repo root; TanStack Start SSR upgrade runs on Lovable import.
+- **Supabase Postgres + private Storage** — live model in `migrations/` (v1: profiles, requester-scoped RLS in `supabase/migrations/20261006_user_scoped_rls.sql`); `supabase/schema.sql` is the stale original scaffold, do not treat as live truth.
+- **Sessions** — Supabase Auth (Google OAuth + email OTP), roles resolve server-side from profiles.
 
 ## Demo path
 

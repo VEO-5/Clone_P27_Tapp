@@ -25,32 +25,30 @@ import {
 } from "@/components/shadcn/table";
 import { apiFetch } from "@/lib/api";
 import { formatRelative } from "@/lib/utils";
-import { recordMockDirectory, type MockAgent } from "@/mocks/fixtures";
+import type { AdminMember } from "./members";
 
 import { CreateAgentDialog } from "./CreateAgentDialog";
 
-const STATUS_LABEL: Record<MockAgent["status"], string> = {
+const STATUS_LABEL: Record<AdminMember["status"], string> = {
   active: "Active",
   invited: "Invited",
   deactivated: "Deactivated",
 };
 
-const STATUS_BADGE: Record<MockAgent["status"], "default" | "secondary" | "outline"> = {
+const STATUS_BADGE: Record<AdminMember["status"], "default" | "secondary" | "outline"> = {
   active: "default",
   invited: "secondary",
   deactivated: "outline",
 };
 
-export function AgentTable({ initialAgents }: { initialAgents: MockAgent[] }) {
+export function AgentTable({ initialAgents }: { initialAgents: AdminMember[] }) {
   const [agents, setAgents] = useState(initialAgents);
-  const [confirming, setConfirming] = useState<MockAgent | null>(null);
+  const [confirming, setConfirming] = useState<AdminMember | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  async function deactivate(agent: MockAgent) {
+  async function deactivate(agent: AdminMember) {
     try {
-      const updated = await apiFetch<MockAgent>(`/admin/agents/${agent.id}`, { method: "DELETE" });
-      // Journal the removal so a refresh can't resurrect the account.
-      recordMockDirectory({ role: "agent", email: updated.email, name: updated.name, status: updated.status });
+      const updated = await apiFetch<AdminMember>(`/admin/agents/${agent.id}`, { method: "DELETE" });
       setAgents((list) => list.map((item) => (item.id === agent.id ? updated : item)));
       setConfirming(null);
       setNotice(`${agent.email} deactivated — their ${agent.openTickets} open tickets were released to Pending.`);

@@ -14,6 +14,13 @@ if (!url || !key) {
   );
 }
 
-export const supabase = createClient(url ?? "", key ?? "", {
-  auth: { persistSession: true, autoRefreshToken: true },
-});
+// Placeholder-tolerant: supabase-js throws on empty key, which would crash
+// unit tests and static builds with no env. Auth calls fail honestly at
+// runtime until real keys are provided (the dev warning above says so).
+export const supabase = createClient(
+  url ?? "https://placeholder.supabase.co",
+  key ?? "placeholder-anon-key",
+  {
+    auth: { persistSession: true, autoRefreshToken: true },
+  },
+);

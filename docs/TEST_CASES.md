@@ -9,7 +9,7 @@ Coverage is split into two layers, arranged in the order a reviewer walks the pr
 
 ## 0. Brief, cleaned up
 
-Employees report Sphere issues (name, email, title, description, screenshots). They receive a reference and can track status (open → in progress → resolved → closed). Support triages from a dashboard. The UI must be rich and responsive — not a generic AI-tool look. Stack: Next.js + Node route handlers, Supabase (with a local fallback), file uploads.
+Employees report Sphere issues (name, email, title, description, screenshots). They receive a reference and can track status (open → in progress → resolved → closed). Support triages from a dashboard. The UI must be rich and responsive — not a generic AI-tool look. Stack _(updated 2026-10-06, was: Next.js + Node route handlers)_: Vite + TanStack Router SPA (Bun), Supabase backend (server functions + requester-scoped RLS), private-storage uploads via presigned URLs.
 
 ---
 

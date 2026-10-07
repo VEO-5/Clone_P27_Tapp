@@ -25,19 +25,14 @@ function liveRouteMatchers(): RegExp[] {
 }
 
 /**
- * Mock-only endpoints: implemented by MSW, never called in live mode by
- * design. Each entry needs its reason — add to this map, never silently.
+ * Allowed exceptions: frontend calls with no live backend route. Each entry
+ * needs its reason — add to this map, never silently. Mock-era entries were
+ * removed with src/mocks (2026-10-06); every remaining call must be live.
  */
-const MOCK_ONLY: { pattern: RegExp; reason: string }[] = [
-  {
-    // useSignOut calls this only when !insforgeLive; live sign-out is SDK-side.
-    pattern: /^\/auth\/logout$/,
-    reason: "mock-only by design: live sign-out is insforge.auth.signOut(), no server route",
-  },
-];
+const MOCK_ONLY: { pattern: RegExp; reason: string }[] = [];
 
 /**
- * Raw fetch() calls outside the apiFetch/liveFetch contract. No envelope
+ * Raw fetch() calls outside the apiFetch contract. No envelope
  * parsing, no parity safety — each needs its reason. New entries fail the
  * suite until they are either routed through apiFetch or justified here.
  */
@@ -49,7 +44,7 @@ const RAW_FETCH_ALLOWLIST: { pattern: RegExp; reason: string }[] = [
   },
   {
     pattern: /^\/desk\/events$/,
-    reason: "no live realtime yet: desk SSE stream is mock-only, needs a realtime design",
+    reason: "no live realtime yet: desk SSE stream needs a realtime design (Supabase Realtime candidate)",
   },
   {
     // CSV blob download — apiFetch only parses JSON envelopes.
@@ -58,9 +53,9 @@ const RAW_FETCH_ALLOWLIST: { pattern: RegExp; reason: string }[] = [
   },
 ];
 
-/** Mock infrastructure: these files ARE the mock server, not app callers. */
-function isMockInfra(file: string): boolean {
-  return file.includes("/mocks/") || file.endsWith("/mockSession.ts");
+/** No mock infrastructure remains (src/mocks removed 2026-10-06). */
+function isMockInfra(_file: string): boolean {
+  return false;
 }
 
 function sourceFiles(dir: string): string[] {
@@ -94,10 +89,10 @@ function normalizeEndpoint(literal: string): string {
   return (cut >= 0 ? literal.slice(0, cut) : literal).split("?")[0];
 }
 
-/** Every apiFetch/liveFetch first-arg string literal starting with "/". */
+/** Every apiFetch first-arg string literal starting with "/". */
 function contractEndpoints(): EndpointUse[] {
   const uses: EndpointUse[] = [];
-  const callPattern = /(?:apiFetch|liveFetch)(?:<[^>]*>)?\(\s*([`'"])((?:(?!\1)[\s\S])*)\1/g;
+  const callPattern = /(?:apiFetch)(?:<[^>]*>)?\(\s*([`'"])((?:(?!\1)[\s\S])*)\1/g;
   for (const file of sourceFiles(SRC_ROOT)) {
     const text = readFileSync(file, "utf8");
     for (const m of text.matchAll(callPattern)) {
@@ -154,7 +149,7 @@ describe("endpoint parity: every frontend call exists on the live backend", () =
     expect(contract.length).toBeGreaterThan(10);
   });
 
-  it("covers every apiFetch/liveFetch path", () => {
+  it("covers every apiFetch path", () => {
     const missing = contract.filter(
       ({ endpoint }) => !isCovered(endpoint, matchers) && !isAllowed(endpoint, MOCK_ONLY),
     );

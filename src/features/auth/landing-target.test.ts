@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { landingTarget } from "./mockSession";
+import { landingTarget } from "@/lib/landing";
 
 describe("landingTarget (?next= hardening)", () => {
   it("honors deep links strictly inside the role landing", () => {

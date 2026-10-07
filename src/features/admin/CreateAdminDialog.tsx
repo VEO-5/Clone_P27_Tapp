@@ -15,10 +15,10 @@ import {
 import { Input } from "@/components/shadcn/input";
 import { Label } from "@/components/shadcn/label";
 import { apiFetch, ApiError } from "@/lib/api";
-import { recordMockDirectory, type MockAgent } from "@/mocks/fixtures";
+import type { AdminMember } from "./members";
 
 /** Create-admin dialog: single email field, domain validated inline before any request. */
-export function CreateAdminDialog({ onCreated }: { onCreated: (admin: MockAgent) => void }) {
+export function CreateAdminDialog({ onCreated }: { onCreated: (admin: AdminMember) => void }) {
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -34,13 +34,10 @@ export function CreateAdminDialog({ onCreated }: { onCreated: (admin: MockAgent)
     setError(null);
     setSaving(true);
     try {
-      const admin = await apiFetch<MockAgent>("/admin/admins", {
+      const admin = await apiFetch<AdminMember>("/admin/admins", {
         method: "POST",
         body: JSON.stringify({ email: parsed.data.email }),
       });
-      // Journal the grant so it survives worker restarts (page reloads) —
-      // MockProvider replays it into the worker on every boot.
-      recordMockDirectory({ role: "admin", email: admin.email, name: admin.name, status: admin.status });
       onCreated(admin);
       setOpen(false);
       setEmail("");
