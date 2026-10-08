@@ -31,8 +31,7 @@ playwright-report/
 apps/web/.env
 apps/web/.env.local
 
-# InsForge & AI agent skills
-.insforge
+# AI agent skills
 .agent
 .agents
 .augment

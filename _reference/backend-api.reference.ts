@@ -1,4 +1,8 @@
 /**
+ * FROZEN ARCHIVE (pre-Supabase, InsForge-era) — reference only, never bundled.
+ * Kept solely as the endpoint spec read by src/lib/endpoint-parity.test.ts.
+ * Do NOT import from app code. Live auth is Supabase (see src/features/auth/).
+ *
  * pearl27-ticketing API — single Edge Function router.
  *
  * All browser data access goes through here. The function authenticates the
